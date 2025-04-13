@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start -c",
+    "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -26,6 +26,7 @@
     "@tanstack/react-query": "^5.73.3",
     "@trpc/react-query": "^11.1.0",
     "@trpc/server": "^11.1.0",
+    "axios": "^1.8.4",
     "expo": "~52.0.43",
     "expo-blur": "~14.0.3",
     "expo-constants": "~17.0.8",
@@ -38,6 +39,8 @@
     "expo-symbols": "~0.2.2",
     "expo-system-ui": "~4.0.9",
     "expo-web-browser": "~14.0.2",
+    "ofetch": "^1.4.1",
+    "pino": "^9.6.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
@@ -52,6 +55,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-class-static-block": "^7.26.0",
     "@biomejs/biome": "1.9.4",
     "@types/jest": "^29.5.12",
     "@types/react": "~18.3.12",

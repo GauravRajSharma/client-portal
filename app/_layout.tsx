@@ -16,6 +16,7 @@ import {
   useSafeAreaInsets,
   SafeAreaView,
 } from "react-native-safe-area-context";
+import { PortalProvider } from "tamagui";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -60,10 +61,12 @@ export default function RootLayout() {
         <TamaguiProvider config={tamaguiConfig}>
           <SafeAreaProvider>
             <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
+              <PortalProvider>
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </PortalProvider>
             </SafeAreaView>
           </SafeAreaProvider>
         </TamaguiProvider>
