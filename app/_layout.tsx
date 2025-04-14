@@ -16,7 +16,7 @@ import {
   useSafeAreaInsets,
   SafeAreaView,
 } from "react-native-safe-area-context";
-import { PortalProvider } from "tamagui";
+import { PortalProvider, Text } from "tamagui";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -38,9 +38,17 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-export default function RootLayout() {
-  const insets = useSafeAreaInsets();
+function Application() {
+  return <Text>Loading..</Text>;
+  return (
+    <Stack>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="+not-found" />
+    </Stack>
+  );
+}
 
+export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
@@ -62,10 +70,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
               <PortalProvider>
-                <Stack>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
+                <Application />
               </PortalProvider>
             </SafeAreaView>
           </SafeAreaProvider>

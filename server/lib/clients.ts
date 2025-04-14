@@ -97,7 +97,7 @@ export function createClients(opts: { BASE_URL: string }) {
       baseURL: env.BRIDGE_ODOO_ENDPOINT,
       ...createApiInterceptors("ODOO"),
       headers: {
-        Authorization: `Basic ${btoa(`emr_sync_user:7Pradesh@EMR`)}`,
+        Authorization: `Basic ${btoa(`emr_sync_user:Admin@1234`)}`,
         "Content-Type": "application/json",
       },
       retry: 1,
@@ -129,7 +129,6 @@ export function createERPClient(opts: { BASE_URL: string }) {
   return extendWithOdooRpc(
     ofetch.create({
       baseURL: `${opts.BASE_URL}:8069`,
-      ...createApiInterceptors("ODOO"),
       headers: {
         Authorization: `Basic ${btoa(`emr_sync_user:7Pradesh@EMR`)}`,
         "Content-Type": "application/json",

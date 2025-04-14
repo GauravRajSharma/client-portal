@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { procedure, router } from "../trpc";
 import { createERPClient } from "../lib/clients";
+import { TRPCError } from "@trpc/server";
+import jwt from "jsonwebtoken";
 
 // "msmh", "icdhup", "kahs", "gulmi", "bajh"
 const hospitals = [
@@ -8,13 +10,12 @@ const hospitals = [
   { prefix: "KAHS", server: "kahs" },
   { prefix: "ICHD", server: "icdhup" },
   { prefix: "GLDH", server: "gulmi" },
-  { prefix: "BAJH", server: "bajh" },
+  { prefix: "BJDH", server: "bajh" },
   { prefix: "SOLU", server: "solu" },
 ];
 
 export const appRouter = router({
   hospitals: procedure.query(async (opts) => {
-    console.log("OK");
     return await Promise.all(
       hospitals.map(async (hospital) => {
         const client = createERPClient({
@@ -38,9 +39,49 @@ export const appRouter = router({
       }),
     )
     .mutation(async (opts) => {
-      await new Promise((res) => setTimeout(res, 1000));
+      let { mrn, server } = opts.input;
+      const hospital = hospitals.find((h) => h.server === server);
 
-      return opts.input;
+      if (!hospital)
+        throw new TRPCError({
+          message: `hospital not found ${server}`,
+          code: "BAD_REQUEST",
+        });
+
+      if (!mrn.toLowerCase().startsWith(hospital?.prefix?.toLowerCase() ?? ""))
+        mrn = `${hospital.prefix}${mrn}`;
+
+      const client = createERPClient({
+        BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
+      });
+
+      try {
+        const patients = await client.rpc<
+          { uuid: string; id: string; name: string }[]
+        >({
+          model: "res.partner",
+          method: "search_read",
+          args: [[["ref", "=", mrn]]],
+          kwargs: {
+            fields: ["uuid", "id", "name"],
+            limit: 1,
+          },
+        });
+
+        let p = patients?.[0];
+
+        if (!p) throw new Error("patient not found");
+
+        const cookie = jwt.sign(p, "super-secret-key");
+
+        return { ...p, cookie };
+      } catch (error) {
+        console.log(error);
+        throw new TRPCError({
+          message: `${error}`,
+          code: "BAD_REQUEST",
+        });
+      }
     }),
 });
 

@@ -68,7 +68,7 @@ export function extendWithOdooRpc<T extends $Fetch>(
         params: {
           service: "common",
           method: "authenticate",
-          args: [opts.DB || "odoo", opts.USERNAME, opts.PASSWORD, {}],
+          args: ["odoo", "admin", "7Pradesh@EMR", {}],
         },
         id,
       };
@@ -137,7 +137,7 @@ export function extendWithOdooRpc<T extends $Fetch>(
             args: [
               opts.DB || "odoo", // Database name
               parseInt(userId),
-              opts.PASSWORD,
+              "7Pradesh@EMR",
               model, // Model name
               method, // Method name
               args, // Positional arguments
@@ -148,10 +148,13 @@ export function extendWithOdooRpc<T extends $Fetch>(
         };
 
         // Make the RPC call
+
         const response = (await client("/jsonrpc", {
           method: "POST",
           body: payload,
         })) as OdooRpcResponse<T>;
+
+        console.dir(response, { depth: null });
 
         // Check for errors in the response
         if (response.error) {
