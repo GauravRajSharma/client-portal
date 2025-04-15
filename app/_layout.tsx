@@ -1,9 +1,13 @@
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import "react-native-reanimated";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 
 import { trpc } from "@/utils/trpc";
@@ -14,11 +18,27 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { PortalProvider, Text } from "tamagui";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { TRPCError } from "@trpc/server";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 0,
+    },
+  },
+  queryCache: new QueryCache({
+    onError(error, query) {
+      if ("data" in error) {
+        const data = error.data as { code: string };
+
+        if (data.code === "UNAUTHORIZED") router.replace("/auth/login");
+      }
+    },
+  }),
+});
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -33,7 +53,6 @@ const trpcClient = trpc.createClient({
       async headers() {
         const token = await AsyncStorage.getItem("access:token");
 
-        console.log({ token });
         return {
           authorization: token ?? "no-token",
         };

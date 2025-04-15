@@ -1,11 +1,14 @@
+import { Protected } from "@/components/protected";
 import { Stack } from "expo-router";
 
 export default function PatientLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    />
+    <Protected>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      />
+    </Protected>
   );
 }

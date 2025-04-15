@@ -208,25 +208,64 @@ export const appRouter = router({
       }
     }),
 
+  patient: protectedProcedure.query(async ({ ctx }) => {
+    const client = createERPClient({
+      BASE_URL: `http://${ctx.auth.server}.netbird.selfhosted`,
+    });
+
+    const patients = await client.rpc<
+      {
+        uuid: string;
+        id: string;
+        name: string;
+        ref: string;
+        nhis_number: string | false;
+        mobile: string | false;
+      }[]
+    >({
+      model: "res.partner",
+      method: "search_read",
+      args: [[["uuid", "=", ctx.auth.uuid]]],
+      kwargs: {
+        fields: ["uuid", "id", "name", "nhis_number", "mobile", "ref"],
+        limit: 1,
+      },
+    });
+
+    return patients?.[0];
+  }),
+
   patientVisits: protectedProcedure.query(async ({ ctx }) => {
     const client = createERPClient({
       BASE_URL: `http://${ctx.auth.server}.netbird.selfhosted`,
     });
+    console.log({ ctx });
 
     const visits = await client.rpc<
       {
         external_uuid: string;
         id: string;
-        name: string;
         display_name: string;
+        department: string;
+        manual_close_visit: boolean;
+        visit_type: string;
       }[]
     >({
       model: "patient.visit",
       method: "search_read",
       args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
       kwargs: {
-        fields: ["external_uuid", "id", "name", "display_name"],
-        limit: 1,
+        fields: [
+          "external_uuid",
+          "id",
+          "display_name",
+          "diagnosis_by",
+          "department",
+          "payment_type",
+          "payment_method",
+          "manual_close_visit",
+          "visit_type",
+        ],
       },
     });
     return visits;

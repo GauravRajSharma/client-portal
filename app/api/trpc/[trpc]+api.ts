@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     endpoint: "/api/trpc",
     req,
     router: appRouter,
+
     createContext: ({ req }) => {
       return { token: req.headers.get("Authorization") };
     },

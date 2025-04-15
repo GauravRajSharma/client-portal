@@ -7,6 +7,7 @@ import { Text } from "tamagui";
 import { Controller, useForm } from "react-hook-form";
 import { Input } from "@/components/auth/input";
 import { trpc } from "@/utils/trpc";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function VerificationPage() {
   const { token, field, value } = useGlobalSearchParams<{
@@ -25,12 +26,7 @@ export default function VerificationPage() {
     },
   });
 
-  const {
-    data: user,
-    mutateAsync: verify,
-    isPending,
-    error,
-  } = trpc.verify.useMutation();
+  const { mutateAsync: verify, isPending, error } = trpc.verify.useMutation();
 
   if (!token || !field || !value) return <Redirect href="/" />;
 
@@ -38,7 +34,8 @@ export default function VerificationPage() {
     try {
       const response = await verify({ token, value: data?.[value] });
       if (response) {
-        router.replace(`/patient/${response.uuid}/visit`);
+        await AsyncStorage.setItem("access:token", response.accessToken);
+        router.replace(`/patient/${response.uuid}/visits`);
       }
     } catch (error) {}
   };
