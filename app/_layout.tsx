@@ -6,17 +6,14 @@ import "react-native-reanimated";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { trpc } from "@/utils/trpc";
 import "../tamagui-web.css";
 import { TamaguiProvider } from "@tamagui/core";
 import tamaguiConfig from "../tamagui.config";
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-  SafeAreaView,
-} from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { PortalProvider, Text } from "tamagui";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -25,27 +22,25 @@ const queryClient = new QueryClient();
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
+      fetch(url, options) {
+        console.log({ url });
+        return fetch(url, options);
+      },
       // [todo]: make it dynamic for the production level servers
       url: "http://192.168.1.70:8081/api/trpc",
 
       // You can pass any HTTP headers you wish here
       async headers() {
+        const token = await AsyncStorage.getItem("access:token");
+
+        console.log({ token });
         return {
-          // authorization: getAuthCookie(),
+          authorization: token ?? "no-token",
         };
       },
     }),
   ],
 });
-
-function Application() {
-  return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-    </Stack>
-  );
-}
 
 export default function RootLayout() {
   const [loaded] = useFonts({

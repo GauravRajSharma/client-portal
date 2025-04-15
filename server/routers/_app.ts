@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { procedure, router } from "../trpc";
 import { createERPClient } from "../lib/clients";
-import { TRPCError } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 
-// "msmh", "icdhup", "kahs", "gulmi", "bajh"
 const hospitals = [
   { prefix: "MSMH", server: "msmh" },
   { prefix: "KAHS", server: "kahs" },
@@ -16,6 +15,39 @@ const hospitals = [
 ];
 
 const JWT_VERIFICATION_KEY = "super secret token put this in env";
+// --
+
+type TAuthData = {
+  uuid: string;
+  name: string;
+  ref: string;
+  server: string;
+};
+
+const t = initTRPC
+  .context<{ token?: string; auth?: TAuthData | null }>()
+  .create();
+
+export const publicProcedure = t.procedure;
+
+const protectedProcedure = t.procedure.use(async (opts) => {
+  try {
+    const result = jwt.verify(opts.ctx.token ?? "-", JWT_VERIFICATION_KEY, {
+      complete: true,
+    });
+
+    if (typeof result.payload !== "object")
+      throw new Error("not a valid auth token");
+
+    return opts.next({
+      ctx: {
+        auth: result.payload as TAuthData,
+      },
+    });
+  } catch (error) {
+    throw new TRPCError({ code: "UNAUTHORIZED", cause: error });
+  }
+});
 
 export const appRouter = router({
   hospitals: procedure.query(async (opts) => {
@@ -175,6 +207,30 @@ export const appRouter = router({
         });
       }
     }),
+
+  patientVisits: protectedProcedure.query(async ({ ctx }) => {
+    const client = createERPClient({
+      BASE_URL: `http://${ctx.auth.server}.netbird.selfhosted`,
+    });
+
+    const visits = await client.rpc<
+      {
+        external_uuid: string;
+        id: string;
+        name: string;
+        display_name: string;
+      }[]
+    >({
+      model: "patient.visit",
+      method: "search_read",
+      args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+      kwargs: {
+        fields: ["external_uuid", "id", "name", "display_name"],
+        limit: 1,
+      },
+    });
+    return visits;
+  }),
 });
 
 async function findTwofaforPatient({
