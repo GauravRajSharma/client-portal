@@ -19,7 +19,10 @@ import { Input } from "./input";
 import { useForm, Controller } from "react-hook-form";
 import { trpc } from "@/utils/trpc";
 import { Check, ChevronDown, ChevronUp } from "@tamagui/lucide-icons";
-import { TextInput } from "react-native";
+import { StyleSheet } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { X } from "@tamagui/lucide-icons";
+import { throttle } from "lodash";
 
 /** simulate signin */
 function useSignIn() {
@@ -129,14 +132,20 @@ export function SignInScreen() {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm({
+  } = useForm<Record<string, string>>({
     defaultValues: {
       mrn: "",
       server: "",
     },
   });
   const { data, isLoading } = trpc.hospitals.useQuery();
-  const { mutate, isPending, data: user, error } = trpc.signIn.useMutation();
+  const {
+    mutate,
+    isPending,
+    data: user,
+    error,
+    isSuccess,
+  } = trpc.signIn.useMutation();
 
   if (isLoading)
     return (
@@ -147,6 +156,8 @@ export function SignInScreen() {
 
   const onSubmit = (data: any) => mutate(data);
 
+  const shouldCheckVerification = isSuccess && user?.verification;
+
   return (
     <View flexDirection="column" minW="100%" maxW="100%" gap="$4">
       <H1
@@ -155,59 +166,85 @@ export function SignInScreen() {
           size: "$7",
         }}
       >
-        Sign in to view your personal health records
+        {shouldCheckVerification
+          ? "Verify to view your personal health records"
+          : "Sign in to view your personal health records"}
       </H1>
       <View flexDirection="column" gap="$3">
-        <View flexDirection="column" gap="$1">
-          <Controller
-            control={control}
-            rules={{
-              required: true,
-            }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input size="$4">
-                <Input.Label htmlFor="hospital">Hospital</Input.Label>
-                <SelectDemoItem
-                  items={data ?? []}
-                  onValueChange={(value) =>
-                    onChange(
-                      data?.find((h) => h.name === value)?.hospital.server,
-                    )
-                  }
-                  value={data?.find((h) => h.hospital.server === value)?.name}
-                />
-              </Input>
-            )}
-            name="server"
-          />
-        </View>
-        <View flexDirection="column" gap="$1">
-          <Controller
-            control={control}
-            rules={{
-              required: true,
-            }}
-            render={({
-              field: { onChange, onBlur, value, name, ref, disabled },
-            }) => (
-              <Input size="$4" ref={ref}>
-                <View flexDirection="row">
-                  <Input.Label htmlFor={"mrn"}>
-                    Medical Record Number (MRN)
-                  </Input.Label>
-                </View>
-                <Input.Box>
-                  <Input.Area
-                    onChange={(e) => onChange(e.nativeEvent.text)}
-                    value={value}
-                    placeholder="ABCD123456"
-                  />
-                </Input.Box>
-              </Input>
-            )}
-            name="mrn"
-          />
-        </View>
+        {shouldCheckVerification ? (
+          <View>
+            <Controller
+              control={control}
+              rules={{
+                required: true,
+              }}
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input size="$4">
+                  <Input.Label> {user?.verification?.field.label}</Input.Label>
+                  <Input.Box>
+                    <Input.Area placeholder="" />
+                  </Input.Box>
+                </Input>
+              )}
+              name={user?.verification?.field.value ?? ""}
+            />
+          </View>
+        ) : (
+          <React.Fragment>
+            <View flexDirection="column" gap="$1">
+              <Controller
+                control={control}
+                rules={{
+                  required: !shouldCheckVerification,
+                }}
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <Input size="$4">
+                    <Input.Label htmlFor="hospital">Hospital</Input.Label>
+                    <SelectDemoItem
+                      items={data ?? []}
+                      onValueChange={(value) =>
+                        onChange(
+                          data?.find((h) => h.name === value)?.hospital.server,
+                        )
+                      }
+                      value={
+                        data?.find((h) => h.hospital.server === value)?.name
+                      }
+                    />
+                  </Input>
+                )}
+                name="server"
+              />
+            </View>
+            <View flexDirection="column" gap="$1">
+              <Controller
+                control={control}
+                rules={{
+                  required: !shouldCheckVerification,
+                }}
+                render={({
+                  field: { onChange, onBlur, value, name, ref, disabled },
+                }) => (
+                  <Input size="$4" ref={ref}>
+                    <View flexDirection="row">
+                      <Input.Label htmlFor={"mrn"}>
+                        Medical Record Number (MRN)
+                      </Input.Label>
+                    </View>
+                    <Input.Box>
+                      <Input.Area
+                        onChange={(e) => onChange(e.nativeEvent.text)}
+                        value={value}
+                        placeholder="ABCD123456"
+                      />
+                    </Input.Box>
+                  </Input>
+                )}
+                name="mrn"
+              />
+            </View>
+          </React.Fragment>
+        )}
       </View>
       <Theme inverse>
         <Button
@@ -237,15 +274,21 @@ export function SignInScreen() {
             </AnimatePresence>
           }
         >
-          <Button.Text>Sign In</Button.Text>
+          <Button.Text>
+            {shouldCheckVerification ? "Sign In" : "Proceed"}
+          </Button.Text>
         </Button>
       </Theme>
 
+      {!shouldCheckVerification && (
+        <ScanVisitTicket
+          onScan={(data: string) => mutate({ mrn: data, server: "" })}
+        />
+      )}
+
       {user && (
         <View>
-          <Text>
-            Welcome, {user.name} {user.cookie}
-          </Text>
+          <Text>Welcome, {user.ref}</Text>
         </View>
       )}
 
@@ -258,17 +301,60 @@ export function SignInScreen() {
   );
 }
 
-// Swap for your own Link
-const Link = ({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) => {
-  return (
-    <View href={href} tag="a">
-      {children}
-    </View>
+function ScanVisitTicket({ onScan }: { onScan: (data: string) => void }) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [showCamera, setShowCamera] = useState(false);
+
+  if (!permission) {
+    return <View />;
+  }
+
+  const handleScan = throttle(
+    ({ data }: { data: string }) => {
+      onScan(data);
+    },
+    1000,
+    { leading: true, trailing: false },
   );
-};
+
+  return (
+    <>
+      <YStack justify="center">
+        <View flexDirection="row" justify="center" width="100%" gap="$4">
+          <View flex={1} height={1} bg="$borderColor" />
+          <Text py="$4" color="gainsboro" mt="$-5">
+            OR
+          </Text>
+          <View flex={1} height={1} bg="$borderColor" />
+        </View>
+
+        <Button
+          icon={showCamera ? X : undefined}
+          onPress={() => {
+            if (permission.granted) setShowCamera(!showCamera);
+            else requestPermission();
+          }}
+        >
+          <Button.Text>
+            {showCamera ? "Close Scanner" : "Scan Your Ticket"}
+          </Button.Text>
+        </Button>
+      </YStack>
+
+      {showCamera && (
+        <View position="absolute" t={0} l={0} r={0} b={0} z={1000}>
+          <CameraView
+            style={StyleSheet.absoluteFillObject}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr"],
+            }}
+            onBarcodeScanned={({ data }) => {
+              setShowCamera(false);
+              handleScan({ data });
+            }}
+          />
+        </View>
+      )}
+    </>
+  );
+}

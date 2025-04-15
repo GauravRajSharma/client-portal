@@ -39,7 +39,6 @@ const trpcClient = trpc.createClient({
 });
 
 function Application() {
-  return <Text>Loading..</Text>;
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -70,7 +69,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
               <PortalProvider>
-                <Application />
+                <Stack screenOptions={{ headerShown: false }} />
               </PortalProvider>
             </SafeAreaView>
           </SafeAreaProvider>

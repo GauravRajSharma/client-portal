@@ -32,6 +32,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Personal Health Records to access your camera",
+          "microphonePermission": "Allow Personal Health Records to access your microphone",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {
