@@ -252,25 +252,24 @@ export const appRouter = router({
   patientLabResults: protectedProcedure
     .input(z.object({ visit: z.string() }))
     .query(async ({ ctx, input }) => {
-      const visits = await ctx.clients.OdooAPI.rpc<{}[]>({
-        model: "patient.visit",
+      const results = await ctx.clients.OdooAPI.rpc<
+        { id: number; lab_item: [number, string] | false; value: string }[]
+      >({
+        model: "emr.lab_observations",
         method: "search_read",
-        args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
-        kwargs: {
-          fields: [
-            "external_uuid",
-            "id",
-            "display_name",
-            "diagnosis_by",
-            "department",
-            "payment_type",
-            "payment_method",
-            "manual_close_visit",
-            "visit_type",
+        args: [
+          [
+            ["patient.uuid", "=", ctx.auth.uuid],
+            ["patient_visit.external_uuid", "=", input.visit],
           ],
-          order: "create_date desc",
+        ],
+        kwargs: {
+          fields: ["lab_item", "id", "value"],
+          order: "create_date asc",
         },
       });
+
+      return results.filter((r) => r.lab_item);
     }),
 
   patientVisits: protectedProcedure.query(async ({ ctx }) => {

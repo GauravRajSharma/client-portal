@@ -155,8 +155,6 @@ export function extendWithOdooRpc<T extends $Fetch>(
           body: payload,
         })) as OdooRpcResponse<T>;
 
-        console.dir(response, { depth: null });
-
         // Check for errors in the response
         if (response.error) {
           // If authentication error, try to re-authenticate once
