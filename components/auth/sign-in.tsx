@@ -190,60 +190,7 @@ export function SignInScreen() {
             />
           </View>
         ) : (
-          <React.Fragment>
-            <View flexDirection="column" gap="$1">
-              <Controller
-                control={control}
-                rules={{
-                  required: !shouldCheckVerification,
-                }}
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <Input size="$4">
-                    <Input.Label htmlFor="hospital">Hospital</Input.Label>
-                    <SelectDemoItem
-                      items={data ?? []}
-                      onValueChange={(value) =>
-                        onChange(
-                          data?.find((h) => h.name === value)?.hospital.server,
-                        )
-                      }
-                      value={
-                        data?.find((h) => h.hospital.server === value)?.name
-                      }
-                    />
-                  </Input>
-                )}
-                name="server"
-              />
-            </View>
-            <View flexDirection="column" gap="$1">
-              <Controller
-                control={control}
-                rules={{
-                  required: !shouldCheckVerification,
-                }}
-                render={({
-                  field: { onChange, onBlur, value, name, ref, disabled },
-                }) => (
-                  <Input size="$4" ref={ref}>
-                    <View flexDirection="row">
-                      <Input.Label htmlFor={"mrn"}>
-                        Medical Record Number (MRN)
-                      </Input.Label>
-                    </View>
-                    <Input.Box>
-                      <Input.Area
-                        onChange={(e) => onChange(e.nativeEvent.text)}
-                        value={value}
-                        placeholder="ABCD123456"
-                      />
-                    </Input.Box>
-                  </Input>
-                )}
-                name="mrn"
-              />
-            </View>
-          </React.Fragment>
+          <React.Fragment></React.Fragment>
         )}
       </View>
       <Theme inverse>

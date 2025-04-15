@@ -1,11 +1,10 @@
-import { Stack } from "expo-router";
+import { Stack as RouterStack } from "expo-router";
 
 export default function AuthLayout() {
   return (
-    <Stack
+    <RouterStack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: "white" },
       }}
     />
   );

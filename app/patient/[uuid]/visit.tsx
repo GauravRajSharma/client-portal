@@ -1,24 +1,21 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-} from "react-native";
-import { router, useRouter } from "expo-router";
+import React from "react";
+
+import { router, useLocalSearchParams } from "expo-router";
+import { Button, Text, View } from "tamagui";
 
 export default function PatientVisit() {
+  const { uuid } = useLocalSearchParams<{ uuid: string }>();
+
   //   const handleSignIn = () => {
   //     router.push("/");
   //   };
 
   return (
-    <SafeAreaView>
-      <View>
-        <Text>Patient Visits</Text>
-        {/* <TextInput
+    <View>
+      <Text>Welcome {uuid}</Text>
+
+      <Button onPress={() => router.replace("/auth/login")}>Logout</Button>
+      {/* <TextInput
           style={styles.input}
           placeholder="Email"
           value={email}
@@ -33,10 +30,9 @@ export default function PatientVisit() {
           onChangeText={setPassword}
           secureTextEntry
         /> */}
-        {/* <TouchableOpacity style={styles.button} onPress={handleSignIn}>
+      {/* <TouchableOpacity style={styles.button} onPress={handleSignIn}>
           <Text style={styles.buttonText}>Sign In</Text>
         </TouchableOpacity> */}
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }

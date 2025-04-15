@@ -1,42 +1,118 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-} from "react-native";
-import { router, useRouter } from "expo-router";
+import React from "react";
+
+import { AuthLayout } from "@/components/auth/layout";
+import { AnimatePresence, Button, H1, Spinner, Theme, View } from "tamagui";
+import { Redirect, router, useGlobalSearchParams } from "expo-router";
+import { Text } from "tamagui";
+import { Controller, useForm } from "react-hook-form";
+import { Input } from "@/components/auth/input";
+import { trpc } from "@/utils/trpc";
 
 export default function VerificationPage() {
-  //   const handleSignIn = () => {
-  //     router.push("/");
-  //   };
+  const { token, field, value } = useGlobalSearchParams<{
+    token: string;
+    field: string;
+    value: string;
+  }>();
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    defaultValues: {
+      [value ?? "-"]: "",
+    },
+  });
+
+  const {
+    data: user,
+    mutateAsync: verify,
+    isPending,
+    error,
+  } = trpc.verify.useMutation();
+
+  if (!token || !field || !value) return <Redirect href="/" />;
+
+  const handleVerify = async (data: Record<string, string>) => {
+    try {
+      const response = await verify({ token, value: data?.[value] });
+      if (response) {
+        router.replace(`/patient/${response.uuid}/visit`);
+      }
+    } catch (error) {}
+  };
 
   return (
-    <SafeAreaView>
-      <View>
-        <Text>Verify</Text>
-        {/* <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        /> */}
-        {/* <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-          <Text style={styles.buttonText}>Sign In</Text>
-        </TouchableOpacity> */}
+    <AuthLayout>
+      <View flexDirection="column" minW="100%" maxW="100%" gap="$4">
+        <H1
+          size="$8"
+          $xs={{
+            size: "$7",
+          }}
+        >
+          Verify to view your personal health records
+        </H1>
+
+        <View>
+          <Controller
+            control={control}
+            rules={{
+              required: true,
+            }}
+            render={({ field: { onChange, value } }) => (
+              <Input size="$4">
+                <Input.Label> {field}</Input.Label>
+                <Input.Box>
+                  <Input.Area
+                    onChange={(e) => onChange(e.nativeEvent.text)}
+                    value={value}
+                    placeholder=""
+                  />
+                </Input.Box>
+              </Input>
+            )}
+            name={value ?? ""}
+          />
+        </View>
+
+        <Theme inverse>
+          <Button
+            disabled={isPending}
+            onPress={handleSubmit(handleVerify)}
+            width="100%"
+            iconAfter={
+              <AnimatePresence>
+                {isPending && (
+                  <Spinner
+                    color="$color"
+                    key="loading-spinner"
+                    opacity={1}
+                    scale={1}
+                    animation="quick"
+                    position="absolute"
+                    enterStyle={{
+                      opacity: 0,
+                      scale: 0.5,
+                    }}
+                    exitStyle={{
+                      opacity: 0,
+                      scale: 0.5,
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+            }
+          >
+            <Button.Text>Verify and Proceed</Button.Text>
+          </Button>
+        </Theme>
+
+        <View>
+          <Text color="$red10">{error?.message}</Text>
+        </View>
       </View>
-    </SafeAreaView>
+    </AuthLayout>
   );
 }

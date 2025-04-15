@@ -15,6 +15,8 @@ const hospitals = [
   { prefix: "SOLU", server: "solu" },
 ];
 
+const JWT_VERIFICATION_KEY = "super secret token put this in env";
+
 export const appRouter = router({
   hospitals: procedure.query(async (opts) => {
     return await Promise.all(
@@ -32,6 +34,71 @@ export const appRouter = router({
     );
   }),
 
+  verify: procedure
+    .input(
+      z.object({
+        token: z.string(),
+        value: z.string(),
+      }),
+    )
+    .mutation(async (opts) => {
+      try {
+        const result = jwt.verify(opts.input.token, JWT_VERIFICATION_KEY, {
+          complete: true,
+        });
+
+        if (!result.payload)
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            cause: "invalid verification request",
+          });
+
+        if (typeof result.payload !== "object")
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            cause: "invalid verification request",
+          });
+        const {
+          uuid,
+          name,
+          ref,
+          server,
+          verification: { hidden },
+        } = result.payload;
+
+        opts.input.value;
+
+        const digest = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          opts.input.value,
+        );
+
+        if (digest !== hidden)
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            cause: "invalid verification request",
+          });
+
+        return {
+          uuid: uuid as string,
+          accessToken: jwt.sign(
+            {
+              uuid,
+              name,
+              ref,
+              server,
+            },
+            JWT_VERIFICATION_KEY,
+          ),
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          cause: "invalid verification request",
+        });
+      }
+    }),
+
   signIn: procedure
     .input(
       z.object({
@@ -47,8 +114,6 @@ export const appRouter = router({
         console.log({ prefix });
         server = hospitals.find((h) => h.prefix === prefix)?.server ?? "";
       }
-
-      console.log({ server, mrn });
 
       const hospital = hospitals.find((h) => h.server === server);
 
@@ -88,21 +153,22 @@ export const appRouter = router({
         let p = patients?.[0];
 
         if (!p) throw new Error("patient not found");
+
         const { uuid, name, ref } = p;
         const verification = await findTwofaforPatient(p);
 
+        if (!verification)
+          throw new Error("verification metric not found for patient. denied.");
+
         const cookie = jwt.sign(
           { uuid, name, ref, server, verification },
-          "super-secret-key",
+          JWT_VERIFICATION_KEY,
         );
 
         const response = { name, ref, verification, cookie };
 
-        console.log({ response });
-
         return response;
       } catch (error) {
-        console.log(error);
         throw new TRPCError({
           message: `${error}`,
           code: "BAD_REQUEST",

@@ -4,7 +4,7 @@ export default function PatientLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
       }}
     />
   );
