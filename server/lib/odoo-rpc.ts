@@ -68,7 +68,7 @@ export function extendWithOdooRpc<T extends $Fetch>(
         params: {
           service: "common",
           method: "authenticate",
-          args: ["odoo", "admin", "7Pradesh@EMR", {}],
+          args: ["odoo", "emr_sync_user", "Admin@1234", {}],
         },
         id,
       };
@@ -89,6 +89,7 @@ export function extendWithOdooRpc<T extends $Fetch>(
 
       return String(authResponse.result);
     } catch (error) {
+      console.log(error);
       throw error;
     }
   }
@@ -137,7 +138,7 @@ export function extendWithOdooRpc<T extends $Fetch>(
             args: [
               opts.DB || "odoo", // Database name
               parseInt(userId),
-              "7Pradesh@EMR",
+              "Admin@1234",
               model, // Model name
               method, // Method name
               args, // Positional arguments

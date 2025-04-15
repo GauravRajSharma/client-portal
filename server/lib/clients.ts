@@ -62,6 +62,7 @@ export function createClients(opts: { BASE_URL: string }) {
     BRIDGE_OPENMRS_ENDPOINT: opts.BASE_URL,
     BRIDGE_ODOO_ENDPOINT: `${opts.BASE_URL}:8069`,
     BRIDGE_SENAITE_ENDPOINT: `${opts.BASE_URL}:8088`,
+    BRIDGE_ENDPOINT: `${opts.BASE_URL}:34567`,
   };
 
   const OpenmrsRAWAPI = ofetch.create({
@@ -91,13 +92,19 @@ export function createClients(opts: { BASE_URL: string }) {
     retry: 1,
   });
 
+  const BridgeApi = ofetch.create({
+    baseURL: env.BRIDGE_ENDPOINT,
+    ...createApiInterceptors("Bridge"),
+    retry: 1,
+  });
+
   // Create the base OdooAPI instance
   const OdooAPI = extendWithOdooRpc(
     ofetch.create({
       baseURL: env.BRIDGE_ODOO_ENDPOINT,
       ...createApiInterceptors("ODOO"),
       headers: {
-        Authorization: `Basic ${btoa(`emr_sync_user:Admin@1234`)}`,
+        Authorization: `Basic ${btoa(`emr_sync_user:7Pradesh@EMR`)}`,
         "Content-Type": "application/json",
       },
       retry: 1,
@@ -122,6 +129,7 @@ export function createClients(opts: { BASE_URL: string }) {
     OpenmrsFHIRAPI,
     OdooAPI,
     SenaiteAPI,
+    BridgeApi,
   };
 }
 

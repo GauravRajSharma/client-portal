@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { procedure, router } from "../trpc";
-import { createERPClient } from "../lib/clients";
+import { createClients, createERPClient } from "../lib/clients";
 import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
@@ -39,9 +39,16 @@ const protectedProcedure = t.procedure.use(async (opts) => {
     if (typeof result.payload !== "object")
       throw new Error("not a valid auth token");
 
+    const auth = result.payload as TAuthData;
+
+    const clients = createClients({
+      BASE_URL: `http://${auth.server}.netbird.selfhosted`,
+    });
+
     return opts.next({
       ctx: {
         auth: result.payload as TAuthData,
+        clients,
       },
     });
   } catch (error) {
@@ -209,11 +216,7 @@ export const appRouter = router({
     }),
 
   patient: protectedProcedure.query(async ({ ctx }) => {
-    const client = createERPClient({
-      BASE_URL: `http://${ctx.auth.server}.netbird.selfhosted`,
-    });
-
-    const patients = await client.rpc<
+    const patients = await ctx.clients.OdooAPI.rpc<
       {
         uuid: string;
         id: string;
@@ -235,13 +238,43 @@ export const appRouter = router({
     return patients?.[0];
   }),
 
-  patientVisits: protectedProcedure.query(async ({ ctx }) => {
-    const client = createERPClient({
-      BASE_URL: `http://${ctx.auth.server}.netbird.selfhosted`,
-    });
-    console.log({ ctx });
+  patientPrescription: protectedProcedure
+    .input(z.object({ visit: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const html = await ctx.clients.BridgeApi<string>(
+        `/summary/${ctx.auth.uuid}/${input.visit}?mode=visit&format=html`,
+      );
+      const cleanedHtml = html.replace(/<img\b[^>]*>/gi, "");
 
-    const visits = await client.rpc<
+      return cleanedHtml;
+    }),
+
+  patientLabResults: protectedProcedure
+    .input(z.object({ visit: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const visits = await ctx.clients.OdooAPI.rpc<{}[]>({
+        model: "patient.visit",
+        method: "search_read",
+        args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+        kwargs: {
+          fields: [
+            "external_uuid",
+            "id",
+            "display_name",
+            "diagnosis_by",
+            "department",
+            "payment_type",
+            "payment_method",
+            "manual_close_visit",
+            "visit_type",
+          ],
+          order: "create_date desc",
+        },
+      });
+    }),
+
+  patientVisits: protectedProcedure.query(async ({ ctx }) => {
+    const visits = await ctx.clients.OdooAPI.rpc<
       {
         external_uuid: string;
         id: string;
@@ -249,6 +282,7 @@ export const appRouter = router({
         department: string;
         manual_close_visit: boolean;
         visit_type: string;
+        diagnosis_by: number[];
       }[]
     >({
       model: "patient.visit",
@@ -266,9 +300,31 @@ export const appRouter = router({
           "manual_close_visit",
           "visit_type",
         ],
+        order: "create_date desc",
       },
     });
-    return visits;
+
+    return Promise.all(
+      visits.map(async (visit) => {
+        const doctor = await ctx.clients.OdooAPI.rpc<
+          {
+            name: string;
+            id: number;
+            license_number: string;
+            specialized_title: string;
+          }[]
+        >({
+          model: "emr.practitioner",
+          method: "search_read",
+          args: [[["id", "=", visit.diagnosis_by?.[0]]]],
+          kwargs: {
+            fields: ["name", "id", "license_number", "specialized_title"],
+            limit: 1,
+          },
+        });
+        return { ...visit, doctor: doctor?.[0] };
+      }),
+    );
   }),
 });
 

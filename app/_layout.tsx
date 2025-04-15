@@ -15,10 +15,10 @@ import "../tamagui-web.css";
 import { TamaguiProvider } from "@tamagui/core";
 import tamaguiConfig from "../tamagui.config";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { PortalProvider, Text } from "tamagui";
+import { PortalProvider } from "tamagui";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { TRPCError } from "@trpc/server";
+import { Alert } from "react-native";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -34,7 +34,9 @@ const queryClient = new QueryClient({
       if ("data" in error) {
         const data = error.data as { code: string };
 
-        if (data.code === "UNAUTHORIZED") router.replace("/auth/login");
+        if (data.code === "UNAUTHORIZED") return router.replace("/auth/login");
+
+        return Alert.alert("Error Occurred:", error.message);
       }
     },
   }),
