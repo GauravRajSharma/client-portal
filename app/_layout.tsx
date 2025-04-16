@@ -48,9 +48,9 @@ const trpcClient = trpc.createClient({
         return fetch(url, options);
       },
       url: Platform.select({
-        native: "http://192.168.1.70:8081/api/trpc",
-        web: `${window?.location?.origin ?? "-"}/api/trpc`,
-        default: "http://192.168.1.70:8081/api/trpc",
+        native: "http://192.168.250.118:8081/api/trpc",
+        web: `${globalThis?.location?.origin ?? "-"}/api/trpc`,
+        default: "http://192.168.250.118:8081/api/trpc",
       }),
 
       // You can pass any HTTP headers you wish here

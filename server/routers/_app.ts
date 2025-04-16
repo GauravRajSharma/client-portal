@@ -6,12 +6,16 @@ import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 
 const hospitals = [
-  { prefix: "MSMH", server: "msmh" },
-  { prefix: "KAHS", server: "kahs" },
-  { prefix: "ICDH", server: "icdhup" },
   { prefix: "GLDH", server: "gulmi" },
+  { prefix: "MSMH", server: "msmh" },
   { prefix: "BJDH", server: "bajh" },
+  { prefix: "ICDH", server: "icdhup" },
+  { prefix: "OKDH", server: "okdh" },
+  { prefix: "KAHS", server: "kahs" },
   { prefix: "SOLU", server: "solu" },
+  { prefix: "MBDH", server: "mbdh-cloud" },
+  { prefix: "ABHU", server: "abhu" },
+  { prefix: "RUPA", server: "rupa" },
 ];
 
 const JWT_VERIFICATION_KEY = "super secret token put this in env";
