@@ -3,11 +3,7 @@ import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import "react-native-reanimated";
-import {
-  QueryCache,
-  QueryClient,
-  QueryClientProvider,
-} from "@tanstack/react-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 
 import { trpc } from "@/utils/trpc";
@@ -21,7 +17,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
-import { asyncStoragePersister, queryStorePresistor } from "@/utils/mmkv";
+import { asyncStoragePersister } from "@/utils/mmkv";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -53,7 +49,7 @@ const trpcClient = trpc.createClient({
       },
       url: Platform.select({
         native: "http://192.168.1.70:8081/api/trpc",
-        web: `${window.location.origin}/api/trpc`,
+        web: `${window?.location?.origin ?? "-"}/api/trpc`,
         default: "http://192.168.1.70:8081/api/trpc",
       }),
 

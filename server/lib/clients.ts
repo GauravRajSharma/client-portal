@@ -123,6 +123,16 @@ export function createClients(opts: { BASE_URL: string }) {
     retry: 1,
   });
 
+  const HapiFHIRAPI = ofetch.create({
+    baseURL: "https://fhir.ehrnepal.com",
+    ...createApiInterceptors("HAPI"),
+    headers: {
+      Authorization: `Basic ${btoa(`admin:admin`)}`,
+      "Content-Type": "application/json",
+    },
+    retry: 1,
+  });
+
   return {
     OpenmrsRAWAPI,
     OpenmrsAPI,
@@ -130,6 +140,7 @@ export function createClients(opts: { BASE_URL: string }) {
     OdooAPI,
     SenaiteAPI,
     BridgeApi,
+    HapiFHIRAPI,
   };
 }
 

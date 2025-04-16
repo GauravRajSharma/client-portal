@@ -25,7 +25,11 @@ type TAuthData = {
 };
 
 const t = initTRPC
-  .context<{ token?: string; auth?: TAuthData | null }>()
+  .context<{
+    token?: string;
+    auth?: TAuthData | null;
+    clients?: ReturnType<typeof createClients>;
+  }>()
   .create();
 
 export const publicProcedure = t.procedure;
@@ -57,7 +61,7 @@ const protectedProcedure = t.procedure.use(async (opts) => {
 });
 
 export const appRouter = router({
-  hospitals: procedure.query(async (opts) => {
+  hospitals: publicProcedure.query(async ({ ctx }) => {
     return await Promise.all(
       hospitals.map(async (hospital) => {
         const client = createERPClient({
@@ -73,7 +77,7 @@ export const appRouter = router({
     );
   }),
 
-  verify: procedure
+  verify: publicProcedure
     .input(
       z.object({
         token: z.string(),
@@ -138,7 +142,7 @@ export const appRouter = router({
       }
     }),
 
-  signIn: procedure
+  signIn: publicProcedure
     .input(
       z.object({
         mrn: z.string(),
@@ -253,7 +257,17 @@ export const appRouter = router({
     .input(z.object({ visit: z.string() }))
     .query(async ({ ctx, input }) => {
       const results = await ctx.clients.OdooAPI.rpc<
-        { id: number; lab_item: [number, string] | false; value: string }[]
+        {
+          id: number;
+          lab_item: [number, string] | false;
+          value: string;
+          raw: {
+            order: { uuid: string };
+            value: string;
+            status: string;
+            concept: { uuid: string };
+          };
+        }[]
       >({
         model: "emr.lab_observations",
         method: "search_read",
@@ -264,12 +278,26 @@ export const appRouter = router({
           ],
         ],
         kwargs: {
-          fields: ["lab_item", "id", "value"],
+          fields: ["lab_item", "id", "value", "raw"],
           order: "create_date asc",
         },
       });
+      let final = results.filter((r) => r.lab_item);
 
-      return results.filter((r) => r.lab_item);
+      return Promise.all(
+        final.map(async (result) => {
+          const meta = await ctx.clients.OpenmrsAPI<{
+            hiAbsolute: number;
+            hiCritical: number;
+            hiNormal: number;
+            lowAbsolute: number;
+            lowCritical: number;
+            lowNormal: number;
+            units: string;
+          }>(`concept/${result.raw.concept.uuid}?v=full`);
+          return { ...result, meta };
+        }),
+      );
     }),
 
   patientVisits: protectedProcedure.query(async ({ ctx }) => {
