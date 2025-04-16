@@ -20,7 +20,7 @@ import { PortalProvider } from "tamagui";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { asyncStoragePersister, queryStorePresistor } from "@/utils/mmkv";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -51,8 +51,11 @@ const trpcClient = trpc.createClient({
         console.log({ url });
         return fetch(url, options);
       },
-      // [todo]: make it dynamic for the production level servers
-      url: "http://192.168.1.70:8081/api/trpc",
+      url: Platform.select({
+        native: "http://192.168.1.70:8081/api/trpc",
+        web: `${window.location.origin}/api/trpc`,
+        default: "http://192.168.1.70:8081/api/trpc",
+      }),
 
       // You can pass any HTTP headers you wish here
       async headers() {
