@@ -1,7 +1,7 @@
 import { trpc } from "@/utils/trpc";
 
 import { Redirect } from "expo-router";
-import { Spinner, Text, View, YStack } from "tamagui";
+import { Spinner, YStack } from "tamagui";
 
 export default function Index() {
   const { data, isLoading } = trpc.patient.useQuery();
@@ -12,6 +12,8 @@ export default function Index() {
         <Spinner size="large" />
       </YStack>
     );
+
+  if (!data) <Redirect href={`/auth/login`} />;
 
   return <Redirect href={`/patient/${data?.uuid}/visits`} />;
 }

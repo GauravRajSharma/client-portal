@@ -17,8 +17,11 @@ import tamaguiConfig from "../tamagui.config";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { PortalProvider } from "tamagui";
 
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
+import { asyncStoragePersister, queryStorePresistor } from "@/utils/mmkv";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -80,7 +83,10 @@ export default function RootLayout() {
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        persistOptions={{ persister: asyncStoragePersister }}
+        client={queryClient}
+      >
         <TamaguiProvider config={tamaguiConfig}>
           <SafeAreaProvider>
             <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
@@ -90,7 +96,7 @@ export default function RootLayout() {
             </SafeAreaView>
           </SafeAreaProvider>
         </TamaguiProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </trpc.Provider>
   );
 }
