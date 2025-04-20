@@ -4,6 +4,52 @@ import { createClients, createERPClient } from "../lib/clients";
 import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
+import { TActiveMedicationOrder } from "../types/initial";
+
+function v(strings: TemplateStringsArray, ...values: any[]): string {
+  let result = strings.reduce((acc, str, i) => {
+    return acc + str + (values[i] || "");
+  }, "");
+
+  return result.replace(/\s+/g, "");
+}
+
+const customFields = {
+  encounters: v`encounters:(
+    uuid,
+    encounterProviders:(provider),
+    diagnoses:(display,certainty),
+    obs:(
+      dateCreated,
+      concept:(uuid,display),
+      display,
+      uuid,
+      groupMembers:(display,uuid,concept:(uuid)),
+      encounter:(form:(uuid))
+    )
+  )`,
+  medications: v`
+    uuid,orderNumber,accessionNumber,
+    patient:ref,action,careSetting:ref,
+    previousOrder:ref,dateActivated,
+    scheduledDate,dateStopped,autoExpireDate,
+    orderType:ref,encounter:ref,
+    orderer:(uuid,display,person:(display)),
+    orderReason,orderReasonNonCoded,
+    orderType,urgency,instructions,
+    commentToFulfiller,
+    drug:(
+      uuid,display,strength,
+      dosageForm:(display,uuid),
+      concept:(display,uuid,names:(name))
+    ),
+    dose,doseUnits:ref,
+    frequency:ref,asNeeded,asNeededCondition,
+    quantity,quantityUnits:ref,numRefills,
+    dosingInstructions,duration,durationUnits:ref,
+    route:ref,brandName,dispenseAsWritten
+  `,
+};
 
 const hospitals = [
   { prefix: "GLDH", server: "gulmi" },
@@ -244,6 +290,21 @@ export const appRouter = router({
     });
 
     return patients?.[0];
+  }),
+  patientActiveMedications: protectedProcedure.query(async ({ ctx }) => {
+    const response = await ctx.clients.OpenmrsAPI<{
+      results: Array<TActiveMedicationOrder>;
+    }>("order", {
+      query: {
+        patient: ctx.auth.uuid,
+        careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+        // status: "ACTIVE",
+        orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+        v: `custom:(${customFields.medications})`,
+      },
+    });
+
+    return response.results;
   }),
 
   patientPrescription: protectedProcedure

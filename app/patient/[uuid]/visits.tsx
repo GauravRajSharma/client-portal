@@ -25,8 +25,10 @@ import {
   BriefcaseMedical,
   Divide,
   FlaskConical,
-  Pill,
+  PanelRightClose,
   Stethoscope,
+  PillBottle,
+  Pill,
 } from "@tamagui/lucide-icons";
 
 type TVisitCardProps = {
@@ -165,20 +167,33 @@ function PatientCard() {
     <YStack gap="$2">
       <Card elevate size="$4" bordered width="100%">
         <Card.Header>
-          <XStack width="100%" justify="space-between" items="center">
-            <Text maxW="50%" fontWeight="bold">
-              {data?.name} — {data?.ref}
-            </Text>
+          <YStack gap="$3">
+            <XStack width="100%" justify="space-between" items="center">
+              <Text maxW="50%" fontWeight="bold">
+                {data?.name} — {data?.ref}
+              </Text>
+              <Button
+                onPress={async () => {
+                  await AsyncStorage.removeItem("access:token");
+                  client.clear();
+                  router.replace("/auth/login");
+                }}
+              >
+                Logout
+              </Button>
+            </XStack>
+
             <Button
-              onPress={async () => {
-                await AsyncStorage.removeItem("access:token");
-                client.clear();
-                router.replace("/auth/login");
-              }}
+              variant="outlined"
+              icon={PillBottle}
+              onPress={() =>
+                // @ts-ignore
+                router.push(`/patient/${data?.uuid}/active-medications`)
+              }
             >
-              Logout
+              View Active Medications
             </Button>
-          </XStack>
+          </YStack>
         </Card.Header>
       </Card>
     </YStack>
@@ -186,7 +201,7 @@ function PatientCard() {
 }
 
 function Visits() {
-  const { data, isLoading, refetch } = trpc.patientVisits.useQuery();
+  const { data, isLoading } = trpc.patientVisits.useQuery();
 
   if (isLoading)
     return (
