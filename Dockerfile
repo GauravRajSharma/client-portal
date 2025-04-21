@@ -23,4 +23,6 @@ RUN npx expo export -p web
 EXPOSE 19006
 
 # Start the Expo web server
-CMD ["npx", "expo", "serve", "--port", "19006"]
+ENTRYPOINT ["npx", "expo", "serve"]
+
+CMD ["--port", "19006"]
