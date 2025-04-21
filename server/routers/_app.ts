@@ -110,21 +110,33 @@ const protectedProcedure = t.procedure.use(async (opts) => {
   }
 });
 
+type THospital = {
+  name: string;
+  hospital: {
+    prefix: string;
+    server: string;
+  };
+};
+
 export const appRouter = router({
-  hospitals: publicProcedure.query(async ({ ctx }) => {
-    return await Promise.all(
+  hospitals: publicProcedure.query(async () => {
+    const results = await Promise.all(
       hospitals.map(async (hospital) => {
         const client = createERPClient({
           BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
         });
 
-        const { name } = await client<{ name: string; address: string }>(
-          "api/hospital",
-        );
-
-        return { name, hospital };
+        try {
+          const { name } = await client<THospital>("api/hospital");
+          return { name, hospital };
+        } catch (error) {
+          console.log("error", error);
+          return;
+        }
       }),
     );
+
+    return results.filter((h) => typeof h !== "undefined") as THospital[];
   }),
 
   verify: publicProcedure
