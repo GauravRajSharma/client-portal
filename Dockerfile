@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as a parent image
-FROM node:18-alpine
+FROM node:20-bullseye
 
 # Set working directory
 WORKDIR /app
@@ -17,10 +17,10 @@ RUN npm install
 COPY . .
 
 # Build the web version of the Expo app
-RUN expo build:web
+RUN npx expo export -p web
 
 # Expose the port that expo serve uses (default 19006)
 EXPOSE 19006
 
 # Start the Expo web server
-CMD ["expo", "serve", "--web-only", "--port", "19006", "--non-interactive"]
+CMD ["npx", "expo", "serve", "--port", "19006"]
