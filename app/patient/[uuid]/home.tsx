@@ -429,7 +429,7 @@ export default function Home() {
   if (nothingYet) {
     return (
       <Screen>
-        <HomeHeader name={patient?.name} mrn={patient?.ref} />
+        <HomeHeader name={patient?.name} mrn={patient?.mrn} />
         <EmptyState
           Icon={HeartPulse}
           title="Your health record is ready"
@@ -451,7 +451,7 @@ export default function Home() {
 
   return (
     <Screen>
-      <HomeHeader name={patient?.name} mrn={patient?.ref} />
+      <HomeHeader name={patient?.name} mrn={patient?.mrn} />
 
       {overview ? (
         <ResultsBlock labs={overview.labs} onOpen={() => go("results")} />

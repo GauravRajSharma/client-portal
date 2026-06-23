@@ -5,20 +5,18 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
-import { toVisit } from "../adapters";
-import type { PatientDocument } from "../dto";
-import { toMedication } from "../adapters";
-import type { Medication, Prescription } from "../dto";
-import { toVisit, toVisitDetail } from "../adapters";
-import type { Visit, VisitDetail } from "../dto";
-import { toLabResult } from "../adapters";
-import type { LabResult } from "../dto";
-import { toBill } from "../adapters";
-import type { Bill } from "../dto";
-import { toLabResult, toMedication, toVisit } from "../adapters";
-import type { LabResult, PatientOverview } from "../dto";
-import { toPatient } from "../adapters";
-import type { Patient } from "../dto";
+import { toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import type {
+    Bill,
+    LabResult,
+    Medication,
+    Patient,
+    PatientDocument,
+    PatientOverview,
+    Prescription,
+    Visit,
+    VisitDetail,
+} from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -338,9 +336,8 @@ export const appRouter = router({
             },
         });
 
-        // The patient's facility name lives on the ERP, not res.partner. Fetch it
-        // tolerantly: a failure here must never break the profile (graceful degrade
-        // to just the server code). This is a read-only GET.
+        // Facility name lives on the ERP, not res.partner. Fetch tolerantly: a
+        // failure here must never break the profile. Read-only GET.
         let hospitalName: string | undefined;
         try {
             const hospital = await ctx.clients.OdooAPI<{ name: string }>(
@@ -386,7 +383,7 @@ export const appRouter = router({
 
     /**
      * Lab results for a single visit, returned as DTOs (LabResult[]).
-     * The UI never sees raw Odoo/OpenMRS shapes - adapters own that mapping.
+     * The UI never sees raw Odoo/OpenMRS shapes; adapters own that mapping.
      */
     patientLabResults: protectedProcedure
         .input(z.object({ visit: z.string() }))
@@ -395,18 +392,51 @@ export const appRouter = router({
         }),
 
     /**
+     * Global lab results across ALL of the patient's visits, as DTOs (LabResult[]).
+     * Same emr.lab_observations source as patientLabResults, without the visit filter.
+     * Identity is taken from the verified token (ctx.auth.uuid) only. Read-only.
+     */
+    patientAllLabResults: protectedProcedure.query(
+        async ({ ctx }): Promise<LabResult[]> => {
+            return fetchLabResults(ctx, {});
+        },
+    ),
+
+    /**
+     * Returns app-owned Visit[] DTOs (see server/dto). The UI never sees raw Odoo
+     * fields; mapping lives in toVisit/toPractitioner. Newest visit first.
+     */
+    patientVisits: protectedProcedure.query(async ({ ctx }): Promise<Visit[]> => {
+        const visits = await fetchRawVisits(ctx);
+
+        return Promise.all(
+            visits.map(async (visit) => {
+                const doctor = await fetchVisitDoctor(ctx, visit.diagnosis_by?.[0]);
+                return toVisit(visit, doctor);
+            }),
+        );
+    }),
+
+    /**
+     * A single visit as a VisitDetail DTO (adds diagnoses on top of Visit). Identity
+     * is the token's uuid; the visit's external_uuid scopes the lookup. Read-only.
+     */
+    patientVisit: protectedProcedure
+        .input(z.object({ visit: z.string() }))
+        .query(async ({ ctx, input }): Promise<VisitDetail | null> => {
+            const visits = await fetchRawVisits(ctx, input.visit);
+            const raw = visits?.[0];
+            if (!raw) return null;
+            const doctor = await fetchVisitDoctor(ctx, raw.diagnosis_by?.[0]);
+            return toVisitDetail(raw, doctor);
+        }),
+
+    /**
      * patientDocuments: read-only catalogue of patient-facing PDFs/HTML the patient
-     * can open. For each of the patient's visits we expose a "Visit summary" (PDF,
-     * receiver=patient) and a stitched "Report" (PDF).
-     *
-     * Security: the patient uuid is taken ONLY from the verified token (ctx.auth.uuid),
-     * never from client input. The [uuid] in the URL is cosmetic (see DESIGN.md).
-     *
-     * We return absolute URLs the app opens directly. The Bridge endpoints are open on
-     * the internal network (no auth header needed), so no byte proxying is required.
+     * can open (a "Visit summary" PDF and a stitched "Report" PDF per visit).
+     * Security: patient uuid comes ONLY from the verified token (ctx.auth.uuid).
      */
     patientDocuments: protectedProcedure.query(async ({ ctx }) => {
-        // Bridge base for this hospital, mirroring createClients() (server:34567).
         const bridgeBase = `http://${ctx.auth.server}.netbird.selfhosted:34567`;
         const patientUuid = ctx.auth.uuid;
 
@@ -423,20 +453,6 @@ export const appRouter = router({
             model: "patient.visit",
             method: "search_read",
             args: [[["partner_id.uuid", "=", patientUuid]]],
-     * patientOverview — read-only aggregate for the Home screen. Reuses the same
-     * backend reads as the per-feature queries (visits, lab observations, active
-     * medications) and maps everything through the adapters into a single DTO so the
-     * UI makes one call. No mutation; identity is from the token (ctx.auth.uuid).
-     */
-    patientOverview: protectedProcedure.query(async ({ ctx }): Promise<PatientOverview> => {
-        const ATTENTION_CAP = 4;
-        const MED_SAMPLE = 3;
-
-        // 1) Latest visit (same model/order as patientVisits; we only need the newest).
-        const latestVisitPromise = ctx.clients.OdooAPI.rpc<any[]>({
-            model: "patient.visit",
-            method: "search_read",
-            args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
             kwargs: {
                 fields: [
                     "external_uuid",
@@ -451,10 +467,7 @@ export const appRouter = router({
             },
         });
 
-        // Flat catalogue of PatientDocument (the DTO the UI speaks).
         const documents: PatientDocument[] = [];
-        // Grouped-by-visit view so the UI can render date/visit headers without
-        // re-deriving visit metadata. Each group's `documents` are pure DTOs.
         const groups: {
             visitId: string;
             title: string;
@@ -494,183 +507,116 @@ export const appRouter = router({
 
         return { documents, groups };
     }),
-     * Global lab results across ALL of the patient's visits, as DTOs (LabResult[]).
-     * Same emr.lab_observations source as patientLabResults, without the visit filter.
-     * Identity is taken from the verified token (ctx.auth.uuid) only. Read-only.
+
+    /**
+     * patientOverview — read-only aggregate for the Home screen. One call returns the
+     * latest visit, lab results needing attention, and active-medication summary, all
+     * as DTOs. Identity is from the token (ctx.auth.uuid). No mutation.
      */
-    patientAllLabResults: protectedProcedure.query(
-        async ({ ctx }): Promise<LabResult[]> => {
-            return fetchLabResults(ctx, {});
-        },
-    ),
-                    "diagnosis_by",
-                    "department",
-                    "payment_type",
-                    "payment_method",
-                    "manual_close_visit",
-                    "visit_type",
-                    "create_date",
-                ],
-                order: "create_date desc",
-                limit: 1,
-            },
-        });
+    patientOverview: protectedProcedure.query(
+        async ({ ctx }): Promise<PatientOverview> => {
+            const ATTENTION_CAP = 4;
+            const MED_SAMPLE = 3;
 
-        // 2) Lab observations across the whole record (same model as patientLabResults,
-        //    minus the per-visit filter) so we can surface anything out of range.
-        const labRawPromise = ctx.clients.OdooAPI.rpc<any[]>({
-            model: "emr.lab_observations",
-            method: "search_read",
-            args: [[["patient.uuid", "=", ctx.auth.uuid]]],
-            kwargs: {
-                fields: ["lab_item", "id", "value", "raw", "create_date"],
-                order: "create_date desc",
-            },
-        });
-
-        // 3) Active medications (same call as patientActiveMedications).
-        const medsPromise = ctx.clients.OpenmrsAPI<{
-            results: Array<TActiveMedicationOrder>;
-        }>("order", {
-            query: {
-                patient: ctx.auth.uuid,
-                careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
-                orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
-                v: `custom:(${customFields.medications})`,
-            },
-        });
-
-        const [latestVisitRaw, labRaw, medsRes] = await Promise.all([
-            latestVisitPromise,
-            labRawPromise,
-            medsPromise,
-        ]);
-
-        // Latest visit -> DTO (resolve its doctor only).
-        let latestVisit: PatientOverview["latestVisit"];
-        const vRaw = latestVisitRaw?.[0];
-        if (vRaw) {
-            const doctor = await ctx.clients.OdooAPI.rpc<any[]>({
-                model: "emr.practitioner",
+            const latestVisitPromise = ctx.clients.OdooAPI.rpc<any[]>({
+                model: "patient.visit",
                 method: "search_read",
-                args: [[["id", "=", vRaw.diagnosis_by?.[0]]]],
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
                 kwargs: {
-                    fields: ["name", "id", "license_number", "specialized_title"],
+                    fields: [
+                        "external_uuid",
+                        "id",
+                        "display_name",
+                        "diagnosis_by",
+                        "department",
+                        "payment_type",
+                        "payment_method",
+                        "manual_close_visit",
+                        "visit_type",
+                        "create_date",
+                    ],
+                    order: "create_date desc",
                     limit: 1,
                 },
             });
-            latestVisit = toVisit(vRaw, doctor?.[0]);
-        }
 
-        // Labs -> DTOs. Only look up concept meta for results that have a lab_item.
-        const labItems = (labRaw ?? []).filter((r) => r.lab_item);
-        const labResults: LabResult[] = await Promise.all(
-            labItems.map(async (r) => {
-                let meta: any = {};
-                try {
-                    meta = await ctx.clients.OpenmrsAPI<any>(
-                        `concept/${r.raw?.concept?.uuid}?v=full`,
-                    );
-                } catch {
-                    meta = {};
-                }
-                return toLabResult(r, meta);
-            }),
-        );
-        const attention = labResults.filter(
-            (r) => r.status !== "normal" && r.status !== "unknown",
-        );
+            const labRawPromise = ctx.clients.OdooAPI.rpc<any[]>({
+                model: "emr.lab_observations",
+                method: "search_read",
+                args: [[["patient.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: ["lab_item", "id", "value", "raw", "create_date"],
+                    order: "create_date desc",
+                },
+            });
 
-        // Active medications -> count + a few recognisable names.
-        const meds = (medsRes.results ?? [])
-            .map((m) => toMedication(m))
-            .filter((m) => m.active);
+            const medsPromise = ctx.clients.OpenmrsAPI<{
+                results: Array<TActiveMedicationOrder>;
+            }>("order", {
+                query: {
+                    patient: ctx.auth.uuid,
+                    careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+                    orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+                    v: `custom:(${customFields.medications})`,
+                },
+            });
 
-        return {
-            latestVisit,
-            labs: {
-                attention: attention.slice(0, ATTENTION_CAP),
-                attentionCount: attention.length,
-                total: labResults.length,
-            },
-            medications: {
-                activeCount: meds.length,
-                sampleNames: meds.slice(0, MED_SAMPLE).map((m) => m.name),
-            },
-        };
-    }),
+            const [latestVisitRaw, labRaw, medsRes] = await Promise.all([
+                latestVisitPromise,
+                labRawPromise,
+                medsPromise,
+            ]);
 
-    patientVisits: protectedProcedure.query(async ({ ctx }) => {
-        const visits = await ctx.clients.OdooAPI.rpc<
-            {
-                external_uuid: string;
-                id: string;
-                display_name: string;
-                department: string;
-                manual_close_visit: boolean;
-                visit_type: string;
-                diagnosis_by: number[];
-            }[]
-        >({
-            model: "patient.visit",
-            method: "search_read",
-            args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
-            kwargs: {
-                fields: [
-                    "external_uuid",
-                    "id",
-                    "display_name",
-                    "diagnosis_by",
-                    "department",
-                    "payment_type",
-                    "payment_method",
-                    "manual_close_visit",
-                    "visit_type",
-                ],
-                order: "create_date desc",
-            },
-        });
-     * Returns app-owned Visit[] DTOs (see server/dto). The UI never sees raw Odoo
-     * fields; mapping lives in toVisit/toPractitioner. Newest visit first.
-     */
-    patientVisits: protectedProcedure.query(async ({ ctx }): Promise<Visit[]> => {
-        const visits = await fetchRawVisits(ctx);
+            let latestVisit: PatientOverview["latestVisit"];
+            const vRaw = latestVisitRaw?.[0];
+            if (vRaw) {
+                const doctor = await fetchVisitDoctor(ctx, vRaw.diagnosis_by?.[0]);
+                latestVisit = toVisit(vRaw, doctor);
+            }
 
-        return Promise.all(
-            visits.map(async (visit) => {
-                const doctor = await fetchVisitDoctor(ctx, visit.diagnosis_by?.[0]);
-                return toVisit(visit, doctor);
-            }),
-        );
-    }),
+            const labItems = (labRaw ?? []).filter((r) => r.lab_item);
+            const labResults: LabResult[] = await Promise.all(
+                labItems.map(async (r) => {
+                    let meta: any = {};
+                    try {
+                        meta = await ctx.clients.OpenmrsAPI<any>(
+                            `concept/${r.raw?.concept?.uuid}?v=full`,
+                        );
+                    } catch {
+                        meta = {};
+                    }
+                    return toLabResult(r, meta);
+                }),
+            );
+            const attention = labResults.filter(
+                (r) => r.status !== "normal" && r.status !== "unknown",
+            );
+
+            const meds = (medsRes.results ?? [])
+                .map((m) => toMedication(m))
+                .filter((m) => m.active);
+
+            return {
+                latestVisit,
+                labs: {
+                    attention: attention.slice(0, ATTENTION_CAP),
+                    attentionCount: attention.length,
+                    total: labResults.length,
+                },
+                medications: {
+                    activeCount: meds.length,
+                    sampleNames: meds.slice(0, MED_SAMPLE).map((m) => m.name),
+                },
+            };
+        },
+    ),
 
     /**
-     * A single visit as a VisitDetail DTO (adds diagnoses on top of Visit). Identity
-     * is the token's uuid; the visit's external_uuid scopes the lookup. Read-only.
-     */
-    patientVisit: protectedProcedure
-        .input(z.object({ visit: z.string() }))
-        .query(async ({ ctx, input }): Promise<VisitDetail | null> => {
-            const visits = await fetchRawVisits(ctx, input.visit);
-            const raw = visits?.[0];
-            if (!raw) return null;
-            const doctor = await fetchVisitDoctor(ctx, raw.diagnosis_by?.[0]);
-            return toVisitDetail(raw, doctor);
-        }),
-     * patientBills — read-only billing & insurance view.
-     *
-     * Identity is taken from the verified token (ctx.auth.uuid); the URL is never
-     * trusted. Returns one Bill per Odoo customer invoice (account.move) for this
-     * patient, each with itemized lines (account.move.line) and an insurance
-     * coverage block when there is any insurance signal (a claim code on the
-     * invoice, or the patient carries an NHIS number).
-     *
-     * This is a pure projection of what the patient owes / was covered. It calls
-     * ONLY read endpoints (search_read) and never posts, pays, or mutates.
+     * patientBills — read-only billing & insurance view. One Bill per Odoo customer
+     * invoice (account.move) for this patient, with itemized lines (account.move.line)
+     * and a coverage block. Identity from the token; calls ONLY search_read.
      */
     patientBills: protectedProcedure.query(async ({ ctx }): Promise<Bill[]> => {
-        // The patient's NHIS / insurance number, for the coverage block. Best
-        // effort; tolerate it being absent.
         let nhisNumber: string | undefined;
         try {
             const partners = await ctx.clients.OdooAPI.rpc<
@@ -687,7 +633,6 @@ export const appRouter = router({
             nhisNumber = undefined;
         }
 
-        // Customer invoices for this patient, newest first. Positive amounts.
         const invoices = await ctx.clients.OdooAPI.rpc<
             {
                 id: number;
@@ -732,8 +677,6 @@ export const appRouter = router({
 
         if (!Array.isArray(invoices) || invoices.length === 0) return [];
 
-        // Itemized lines per invoice. Skip note/section/subtotal rows
-        // (display_type set) so the patient sees real charges only.
         return Promise.all(
             invoices.map(async (inv) => {
                 let lines: any[] = [];
@@ -834,10 +777,7 @@ async function fetchVisitDoctor(
         },
     });
     return doctor?.[0];
-type LabCtx = {
-    auth: TAuthData;
-    clients: ReturnType<typeof createClients>;
-};
+}
 
 type RawLabObservation = {
     id: number;
@@ -863,15 +803,12 @@ type ConceptMeta = {
 };
 
 /**
- * Shared lab-observation fetch + DTO mapping for both the per-visit and the global
- * (all-visits) lab queries. Pulls observations from Odoo (emr.lab_observations),
- * enriches each with its OpenMRS concept reference range, and returns LabResult[].
- *
- * Concept metadata is fetched once per distinct concept (deduped) so the global query
- * across many visits does not refetch the same reference ranges repeatedly.
+ * Shared lab-observation fetch + DTO mapping for the per-visit and global lab queries.
+ * Pulls observations from Odoo (emr.lab_observations), enriches each with its OpenMRS
+ * concept reference range (deduped, one call per distinct concept), returns LabResult[].
  */
 async function fetchLabResults(
-    ctx: LabCtx,
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
     opts: { visit?: string },
 ): Promise<LabResult[]> {
     const domain: any[] = [["patient.uuid", "=", ctx.auth.uuid]];
@@ -891,7 +828,6 @@ async function fetchLabResults(
 
     const final = observations.filter((r) => r.lab_item);
 
-    // Dedupe concept lookups: one OpenMRS call per distinct concept uuid.
     const conceptCache = new Map<string, Promise<ConceptMeta | undefined>>();
     const loadConcept = (uuid?: string) => {
         if (!uuid) return Promise.resolve(undefined);

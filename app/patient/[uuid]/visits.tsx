@@ -440,7 +440,7 @@ export default function PatientVisits() {
           <IdentityChip
             patient={
               patient
-                ? { name: patient.name, mrn: patient.ref, hospital: undefined }
+                ? { name: patient.name, mrn: patient.mrn, hospital: undefined }
                 : undefined
             }
           />
