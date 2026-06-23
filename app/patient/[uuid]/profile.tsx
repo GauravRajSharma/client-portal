@@ -11,6 +11,9 @@ import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  Building2,
+  ChevronRight,
+  FlaskConical,
   Hospital as HospitalIcon,
   IdCard,
   LogOut,
@@ -297,6 +300,35 @@ export default function Profile() {
           {details}
         </YStack>
       )}
+
+      <Section title="More">
+        <Panel p="$0" gap="$0">
+          {[
+            { Icon: FlaskConical, label: "Book a test", to: "book" },
+            { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },
+          ].map((item, i) => (
+            <XStack
+              key={item.to}
+              items="center"
+              gap="$3"
+              px="$4"
+              py="$3.5"
+              borderTopWidth={i > 0 ? 1 : 0}
+              borderColor="$border"
+              onPress={() => router.push(`/patient/${data.id}/${item.to}` as any)}
+              pressStyle={{ opacity: 0.6 }}
+            >
+              <YStack width={38} height={38} rounded={10} bg="$primarySoft" items="center" justify="center">
+                <item.Icon size={18} color="$primary" />
+              </YStack>
+              <Text flex={1} fontSize="$4" fontWeight="600" color="$color12">
+                {item.label}
+              </Text>
+              <ChevronRight size={18} color="$text3" />
+            </XStack>
+          ))}
+        </Panel>
+      </Section>
 
       <Separator borderColor="$borderColor" my="$2" />
       <SignOutButton />

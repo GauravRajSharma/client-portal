@@ -41,12 +41,12 @@ export function Screen({
   );
   if (!scroll)
     return (
-      <YStack flex={1} bg="$background">
+      <YStack flex={1} bg="$appBg">
         {inner}
       </YStack>
     );
   return (
-    <ScrollView flex={1} bg="$background" showsVerticalScrollIndicator={false}>
+    <ScrollView flex={1} bg="$appBg" showsVerticalScrollIndicator={false}>
       {inner}
     </ScrollView>
   );
@@ -84,12 +84,15 @@ export function Section({
 /** Panel — a single bordered surface. Never nest Panels (see DESIGN.md). */
 export const Panel = styled(YStack, {
   name: "Panel",
-  bg: "$color1",
-  borderColor: "$borderColor",
+  bg: "$surface",
+  borderColor: "$border",
   borderWidth: 1,
-  rounded: "$6",
+  rounded: 16,
   p: "$4",
   gap: "$3",
+  shadowColor: "rgba(16,36,61,0.06)",
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
 });
 
 /** Row — a tappable list row inside a Panel/list. */
