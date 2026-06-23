@@ -1,32 +1,17 @@
 import React from "react";
 import { router } from "expo-router";
-import { Controller, useForm } from "react-hook-form";
 import {
-  CheckCircle,
-  CreditCard,
+  ArrowRight,
   Fingerprint,
+  Hospital,
   KeyRound,
   Lock,
   Mail,
   ScanFace,
-  ShieldCheck,
 } from "@tamagui/lucide-icons";
-import { Button, Text, Theme, XStack, YStack } from "tamagui";
+import { Button, Text, XStack, YStack } from "tamagui";
 
-import { trpc } from "@/utils/trpc";
-import {
-  AuthError,
-  AuthField,
-  AuthSelectField,
-  AuthSubmit,
-  friendlyAuthError,
-} from "@/components/auth/input";
-import { HospitalSelect } from "@/components/auth/sign-in";
-import { ScanVisitTicket } from "@/components/auth/scan";
-import { AuthLayout, FormStack } from "@/components/auth/layout";
-import { Skeleton } from "@/components/ui";
-
-type SignInForm = { mrn: string; server: string };
+import { AuthLayout } from "@/components/auth/layout";
 
 /** A read-only, disabled field rendered for the not-yet-available app-account flow. */
 function GhostField({ Icon, placeholder }: { Icon: any; placeholder: string }) {
@@ -52,30 +37,16 @@ function GhostField({ Icon, placeholder }: { Icon: any; placeholder: string }) {
 
 /**
  * The future "app account" sign-in (email + password + biometrics). Present, on-brand,
- * and clearly marked Coming soon. The working sign-in is the hospital record below.
+ * and clearly marked Coming soon. The working way in is the hospital record below.
  */
 function AppAccountComingSoon() {
   return (
-    <YStack
-      gap="$2.5"
-      p="$3.5"
-      rounded={16}
-      borderWidth={1}
-      borderColor="$border"
-      bg="$surface"
-    >
+    <YStack gap="$2.5" p="$3.5" rounded={16} borderWidth={1} borderColor="$border" bg="$surface">
       <XStack items="center" justify="space-between">
         <Text fontSize={13} fontWeight="700" color="$color12">
           Sign in with your app account
         </Text>
-        <XStack
-          items="center"
-          gap="$1.5"
-          bg="$primarySoft"
-          px="$2"
-          py="$1"
-          rounded={20}
-        >
+        <XStack items="center" gap="$1.5" bg="$primarySoft" px="$2" py="$1" rounded={20}>
           <Lock size={11} color="$primary" />
           <Text fontSize={10} fontWeight="700" color="$primary">
             COMING SOON
@@ -114,77 +85,7 @@ function AppAccountComingSoon() {
   );
 }
 
-/** "or sign in from your hospital" divider. */
-function OrDivider() {
-  return (
-    <XStack items="center" gap="$3" my="$1">
-      <YStack flex={1} height={1} bg="$border" />
-      <Text fontSize={12} color="$text3" fontWeight="600">
-        or sign in from your hospital
-      </Text>
-      <YStack flex={1} height={1} bg="$border" />
-    </XStack>
-  );
-}
-
 export default function SignIn() {
-  const {
-    control,
-    handleSubmit,
-    setValue,
-    setError,
-    clearErrors,
-    watch,
-    formState: { errors },
-  } = useForm<SignInForm>({ defaultValues: { mrn: "", server: "" } });
-
-  const {
-    data: hospitals,
-    isLoading: isHospitalsLoading,
-    isError: isHospitalsError,
-    refetch: refetchHospitals,
-    isRefetching: isHospitalsRefetching,
-  } = trpc.hospitals.useQuery();
-
-  const { mutateAsync: signIn, isPending, error } = trpc.signIn.useMutation();
-
-  const selectedServer = watch("server");
-  const mrnValue = watch("mrn");
-  const selectedHospital = hospitals?.find(
-    (h) => h.hospital.server === selectedServer,
-  );
-  const hospitalsReady = Boolean(hospitals && hospitals.length > 0);
-
-  const handleSignIn = async (data: SignInForm) => {
-    try {
-      const response = await signIn(data);
-      if (response?.verification) {
-        const q = new URLSearchParams({
-          token: response.cookie,
-          field: response.verification.field.label,
-          value: response.verification.field.value,
-        }).toString();
-        router.push(`/auth/verify?${q}`);
-      }
-    } catch {
-      // surfaced via friendlyAuthError(error) below
-    }
-  };
-
-  const handleScan = (data: string) => {
-    const mrn = data.trim();
-    setValue("mrn", mrn, { shouldValidate: true });
-    if (!selectedServer) {
-      setError("server", {
-        type: "required",
-        message: "First choose your hospital, then scan your ticket.",
-      });
-      return;
-    }
-    clearErrors("server");
-    handleSignIn({ mrn, server: selectedServer });
-  };
-
   return (
     <AuthLayout>
       <YStack gap="$1" items="center" mb="$1">
@@ -198,134 +99,34 @@ export default function SignIn() {
 
       <AppAccountComingSoon />
 
-      <OrDivider />
+      <XStack items="center" gap="$3" my="$1">
+        <YStack flex={1} height={1} bg="$border" />
+        <Text fontSize={12} color="$text3" fontWeight="600">
+          or
+        </Text>
+        <YStack flex={1} height={1} bg="$border" />
+      </XStack>
 
-      {selectedHospital ? (
-        <XStack
-          items="center"
-          gap="$2.5"
-          px="$3"
-          py="$2.5"
-          rounded={12}
-          bg="$primarySoft"
-        >
-          <ShieldCheck size={16} color="$primary" />
-          <Text fontSize={13} color="$color12" flex={1} numberOfLines={1}>
-            Signing in to{" "}
-            <Text fontWeight="700" color="$color12">
-              {selectedHospital.name}
-            </Text>
+      {/* The working way in today: a patient's hospital record. Own page. */}
+      <Button
+        height={54}
+        rounded={14}
+        bg="$primary"
+        pressStyle={{ bg: "$primaryStrong", borderColor: "$primaryStrong" }}
+        borderWidth={0}
+        onPress={() => router.push("/auth/hospital")}
+      >
+        <XStack items="center" gap="$2.5">
+          <Hospital size={19} color="$onPrimary" />
+          <Text fontSize={16} fontWeight="700" color="$onPrimary">
+            Sign in with your hospital record
           </Text>
+          <ArrowRight size={18} color="$onPrimary" />
         </XStack>
-      ) : null}
-
-      <FormStack>
-        {isHospitalsError || (!isHospitalsLoading && !hospitalsReady) ? (
-          <AuthSelectField
-            label="Hospital"
-            htmlFor="hospital"
-            error={
-              isHospitalsError
-                ? "We could not load the hospital list. Please try again."
-                : "No hospitals are available right now. Please try again shortly."
-            }
-          >
-            <Button
-              height={52}
-              rounded={14}
-              bg="$surface"
-              borderWidth={1}
-              borderColor="$borderStrong"
-              disabled={isHospitalsRefetching}
-              onPress={() => refetchHospitals()}
-            >
-              <Button.Text fontSize="$4" fontWeight="700" color="$color12">
-                {isHospitalsRefetching ? "Trying again" : "Try again"}
-              </Button.Text>
-            </Button>
-          </AuthSelectField>
-        ) : isHospitalsLoading ? (
-          <YStack gap="$2">
-            <Skeleton height={16} width="30%" rounded="$3" />
-            <Skeleton height={52} rounded={14} width="100%" />
-          </YStack>
-        ) : (
-          <Controller
-            control={control}
-            rules={{ required: "Choose your hospital to continue." }}
-            name="server"
-            render={({ field: { onChange, value } }) => (
-              <AuthSelectField
-                label="Hospital"
-                htmlFor="hospital"
-                helper="Your records are kept at one hospital."
-                error={errors.server?.message}
-              >
-                <HospitalSelect
-                  id="hospital"
-                  items={hospitals ?? []}
-                  invalid={Boolean(errors.server)}
-                  value={hospitals?.find((h) => h.hospital.server === value)?.name}
-                  onValueChange={(name) =>
-                    onChange(
-                      hospitals?.find((h) => h.name === name)?.hospital.server ?? "",
-                    )
-                  }
-                />
-              </AuthSelectField>
-            )}
-          />
-        )}
-
-        <Controller
-          control={control}
-          rules={{
-            required: "Enter your Medical Record Number.",
-            minLength: { value: 4, message: "That MRN looks too short." },
-          }}
-          name="mrn"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <AuthField
-              label="Medical Record Number (MRN)"
-              nativeID="mrn"
-              Icon={CreditCard}
-              value={value}
-              onChangeText={(t) => onChange(t.trim())}
-              onBlur={onBlur}
-              placeholder="ABCD123456"
-              helper="Printed on your hospital card or visit ticket sticker."
-              error={errors.mrn?.message}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoComplete="off"
-              returnKeyType="go"
-              onSubmitEditing={handleSubmit(handleSignIn)}
-            />
-          )}
-        />
-
-        {mrnValue && !errors.mrn ? (
-          <XStack items="center" gap="$2" px="$1">
-            <CheckCircle size={15} color="$good" />
-            <Text fontSize={12} color="$text2">
-              Record number captured.
-            </Text>
-          </XStack>
-        ) : null}
-
-        <AuthError message={friendlyAuthError(error, "signin")} />
-
-        <AuthSubmit
-          label="Continue"
-          pendingLabel="Checking your record"
-          pending={isPending}
-          disabled={!hospitalsReady}
-          Icon={ShieldCheck}
-          onPress={handleSubmit(handleSignIn)}
-        />
-      </FormStack>
-
-      <ScanVisitTicket onScan={handleScan} />
+      </Button>
+      <Text fontSize={12} color="$text3" text="center" mt="$-1">
+        Use your MRN or scan your visit-ticket sticker.
+      </Text>
     </AuthLayout>
   );
 }
