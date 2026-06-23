@@ -4,6 +4,7 @@ import {
   FlaskConical,
   LayoutGrid,
   Pill,
+  Plus,
   Stethoscope,
   User,
 } from "@tamagui/lucide-icons";
@@ -56,14 +57,14 @@ function SideItem({
       px="$3"
       py="$2.5"
       rounded="$4"
-      bg={active ? "$color3" : "transparent"}
-      hoverStyle={{ bg: active ? "$color3" : "$color2" }}
+      bg={active ? "$primarySoft" : "transparent"}
+      hoverStyle={{ bg: active ? "$primarySoft" : "$surface2" }}
       pressStyle={{ opacity: 0.7 }}
       animation="quick"
       onPress={onPress}
       cursor="pointer"
     >
-      <item.Icon size={20} color={active ? "$accent9" : "$color10"} />
+      <item.Icon size={20} color={active ? "$primary" : "$text2"} />
       <Text
         fontSize="$4"
         fontWeight={active ? "700" : "500"}
@@ -97,11 +98,11 @@ function Tab({
       onPress={onPress}
       pressStyle={{ opacity: 0.6 }}
     >
-      <item.Icon size={22} color={active ? "$accent9" : "$color9"} />
+      <item.Icon size={22} color={active ? "$primary" : "$text3"} />
       <Text
         fontSize={11}
         fontWeight={active ? "700" : "500"}
-        color={active ? "$accent9" : "$color9"}
+        color={active ? "$primary" : "$text3"}
         numberOfLines={1}
       >
         {label}
@@ -124,29 +125,20 @@ export function NavShell({ children }: { children: ReactNode }) {
 
   if (media.md) {
     return (
-      <XStack flex={1} bg="$background">
+      <XStack flex={1} bg="$appBg">
         <YStack
           width={252}
-          bg="$color1"
+          bg="$surface"
           borderRightWidth={1}
-          borderColor="$borderColor"
+          borderColor="$border"
           px="$3"
           py="$4"
           gap="$1"
         >
           <XStack items="center" gap="$2.5" px="$3" pb="$4">
-            <Theme name="accent">
-              <YStack
-                width={30}
-                height={30}
-                rounded="$4"
-                bg="$accent9"
-                items="center"
-                justify="center"
-              >
-                <Activity size={18} color="#fff" />
-              </YStack>
-            </Theme>
+            <YStack width={30} height={30} rounded="$4" bg="$primary" items="center" justify="center">
+              <Activity size={18} color="#fff" />
+            </YStack>
             <Text fontSize="$5" fontWeight="800" color="$color12">
               EHRPlus
             </Text>
@@ -167,12 +159,34 @@ export function NavShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <YStack flex={1} bg="$background">
+    <YStack flex={1} bg="$appBg">
       <YStack flex={1}>{children}</YStack>
+
+      {/* Add result — designed, alpha-gated. */}
+      <YStack
+        position="absolute"
+        r={18}
+        b={insets.bottom + 78}
+        width={54}
+        height={54}
+        rounded={27}
+        bg="$primary"
+        items="center"
+        justify="center"
+        z={60}
+        shadowColor="rgba(11,78,160,0.4)"
+        shadowRadius={16}
+        shadowOffset={{ width: 0, height: 8 }}
+        pressStyle={{ bg: "$primaryStrong", scale: 0.96 }}
+        onPress={() => router.push(`/patient/${patientUuid}/add` as any)}
+      >
+        <Plus size={26} color="$onPrimary" />
+      </YStack>
+
       <XStack
-        bg="$color1"
+        bg="$surface"
         borderTopWidth={1}
-        borderColor="$borderColor"
+        borderColor="$border"
         pb={insets.bottom}
         px="$1"
       >
