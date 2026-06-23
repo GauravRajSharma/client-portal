@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { toVisit } from "../adapters";
+import type { PatientDocument } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -398,6 +400,93 @@ export const appRouter = router({
                 }),
             );
         }),
+
+    /**
+     * patientDocuments: read-only catalogue of patient-facing PDFs/HTML the patient
+     * can open. For each of the patient's visits we expose a "Visit summary" (PDF,
+     * receiver=patient) and a stitched "Report" (PDF).
+     *
+     * Security: the patient uuid is taken ONLY from the verified token (ctx.auth.uuid),
+     * never from client input. The [uuid] in the URL is cosmetic (see DESIGN.md).
+     *
+     * We return absolute URLs the app opens directly. The Bridge endpoints are open on
+     * the internal network (no auth header needed), so no byte proxying is required.
+     */
+    patientDocuments: protectedProcedure.query(async ({ ctx }) => {
+        // Bridge base for this hospital, mirroring createClients() (server:34567).
+        const bridgeBase = `http://${ctx.auth.server}.netbird.selfhosted:34567`;
+        const patientUuid = ctx.auth.uuid;
+
+        const visits = await ctx.clients.OdooAPI.rpc<
+            {
+                external_uuid: string;
+                id: string;
+                display_name: string;
+                department: string;
+                manual_close_visit: boolean;
+                visit_type: string;
+            }[]
+        >({
+            model: "patient.visit",
+            method: "search_read",
+            args: [[["partner_id.uuid", "=", patientUuid]]],
+            kwargs: {
+                fields: [
+                    "external_uuid",
+                    "id",
+                    "display_name",
+                    "department",
+                    "create_date",
+                    "manual_close_visit",
+                    "visit_type",
+                ],
+                order: "create_date desc",
+            },
+        });
+
+        // Flat catalogue of PatientDocument (the DTO the UI speaks).
+        const documents: PatientDocument[] = [];
+        // Grouped-by-visit view so the UI can render date/visit headers without
+        // re-deriving visit metadata. Each group's `documents` are pure DTOs.
+        const groups: {
+            visitId: string;
+            title: string;
+            date?: string;
+            typeLabel: string;
+            documents: PatientDocument[];
+        }[] = [];
+
+        for (const visit of visits) {
+            const v = toVisit(visit);
+            if (!v.id) continue;
+
+            const summary: PatientDocument = {
+                id: `summary-${v.id}`,
+                title: "Visit summary",
+                kind: "summary",
+                format: "pdf",
+                url: `${bridgeBase}/summary/${patientUuid}/${v.id}?format=pdf&receiver=patient`,
+            };
+            const report: PatientDocument = {
+                id: `report-${v.id}`,
+                title: "Report",
+                kind: "report",
+                format: "pdf",
+                url: `${bridgeBase}/reports/${v.id}`,
+            };
+
+            documents.push(summary, report);
+            groups.push({
+                visitId: v.id,
+                title: v.typeLabel,
+                date: v.date,
+                typeLabel: v.typeLabel,
+                documents: [summary, report],
+            });
+        }
+
+        return { documents, groups };
+    }),
 
     patientVisits: protectedProcedure.query(async ({ ctx }) => {
         const visits = await ctx.clients.OdooAPI.rpc<
