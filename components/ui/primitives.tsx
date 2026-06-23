@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { NamedExoticComponent } from "react";
 import {
   Button,
   H3,
@@ -10,7 +11,6 @@ import {
   YStack,
   styled,
 } from "tamagui";
-import type { NamedExoticComponent } from "react";
 
 /**
  * Screen — the page frame. Constrains content width on web, scrolls, and gives a
@@ -39,7 +39,12 @@ export function Screen({
       {children}
     </YStack>
   );
-  if (!scroll) return <YStack flex={1} bg="$background">{inner}</YStack>;
+  if (!scroll)
+    return (
+      <YStack flex={1} bg="$background">
+        {inner}
+      </YStack>
+    );
   return (
     <ScrollView flex={1} bg="$background" showsVerticalScrollIndicator={false}>
       {inner}
@@ -151,10 +156,15 @@ export function Money({
 }) {
   const v =
     amount === undefined || Number.isNaN(amount)
-      ? "—"
+      ? "-"
       : `${currency} ${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   return (
-    <Text fontSize={size} fontWeight={weight} color={color} fontVariant={["tabular-nums"]}>
+    <Text
+      fontSize={size}
+      fontWeight={weight}
+      color={color}
+      fontVariant={["tabular-nums"]}
+    >
       {v}
     </Text>
   );
