@@ -15,6 +15,8 @@ import { toLabResult } from "../adapters";
 import type { LabResult } from "../dto";
 import { toBill } from "../adapters";
 import type { Bill } from "../dto";
+import { toLabResult, toMedication, toVisit } from "../adapters";
+import type { LabResult, PatientOverview } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -404,6 +406,20 @@ export const appRouter = router({
             model: "patient.visit",
             method: "search_read",
             args: [[["partner_id.uuid", "=", patientUuid]]],
+     * patientOverview — read-only aggregate for the Home screen. Reuses the same
+     * backend reads as the per-feature queries (visits, lab observations, active
+     * medications) and maps everything through the adapters into a single DTO so the
+     * UI makes one call. No mutation; identity is from the token (ctx.auth.uuid).
+     */
+    patientOverview: protectedProcedure.query(async ({ ctx }): Promise<PatientOverview> => {
+        const ATTENTION_CAP = 4;
+        const MED_SAMPLE = 3;
+
+        // 1) Latest visit (same model/order as patientVisits; we only need the newest).
+        const latestVisitPromise = ctx.clients.OdooAPI.rpc<any[]>({
+            model: "patient.visit",
+            method: "search_read",
+            args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
             kwargs: {
                 fields: [
                     "external_uuid",
@@ -470,6 +486,102 @@ export const appRouter = router({
             return fetchLabResults(ctx, {});
         },
     ),
+                    "diagnosis_by",
+                    "department",
+                    "payment_type",
+                    "payment_method",
+                    "manual_close_visit",
+                    "visit_type",
+                    "create_date",
+                ],
+                order: "create_date desc",
+                limit: 1,
+            },
+        });
+
+        // 2) Lab observations across the whole record (same model as patientLabResults,
+        //    minus the per-visit filter) so we can surface anything out of range.
+        const labRawPromise = ctx.clients.OdooAPI.rpc<any[]>({
+            model: "emr.lab_observations",
+            method: "search_read",
+            args: [[["patient.uuid", "=", ctx.auth.uuid]]],
+            kwargs: {
+                fields: ["lab_item", "id", "value", "raw", "create_date"],
+                order: "create_date desc",
+            },
+        });
+
+        // 3) Active medications (same call as patientActiveMedications).
+        const medsPromise = ctx.clients.OpenmrsAPI<{
+            results: Array<TActiveMedicationOrder>;
+        }>("order", {
+            query: {
+                patient: ctx.auth.uuid,
+                careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+                orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+                v: `custom:(${customFields.medications})`,
+            },
+        });
+
+        const [latestVisitRaw, labRaw, medsRes] = await Promise.all([
+            latestVisitPromise,
+            labRawPromise,
+            medsPromise,
+        ]);
+
+        // Latest visit -> DTO (resolve its doctor only).
+        let latestVisit: PatientOverview["latestVisit"];
+        const vRaw = latestVisitRaw?.[0];
+        if (vRaw) {
+            const doctor = await ctx.clients.OdooAPI.rpc<any[]>({
+                model: "emr.practitioner",
+                method: "search_read",
+                args: [[["id", "=", vRaw.diagnosis_by?.[0]]]],
+                kwargs: {
+                    fields: ["name", "id", "license_number", "specialized_title"],
+                    limit: 1,
+                },
+            });
+            latestVisit = toVisit(vRaw, doctor?.[0]);
+        }
+
+        // Labs -> DTOs. Only look up concept meta for results that have a lab_item.
+        const labItems = (labRaw ?? []).filter((r) => r.lab_item);
+        const labResults: LabResult[] = await Promise.all(
+            labItems.map(async (r) => {
+                let meta: any = {};
+                try {
+                    meta = await ctx.clients.OpenmrsAPI<any>(
+                        `concept/${r.raw?.concept?.uuid}?v=full`,
+                    );
+                } catch {
+                    meta = {};
+                }
+                return toLabResult(r, meta);
+            }),
+        );
+        const attention = labResults.filter(
+            (r) => r.status !== "normal" && r.status !== "unknown",
+        );
+
+        // Active medications -> count + a few recognisable names.
+        const meds = (medsRes.results ?? [])
+            .map((m) => toMedication(m))
+            .filter((m) => m.active);
+
+        return {
+            latestVisit,
+            labs: {
+                attention: attention.slice(0, ATTENTION_CAP),
+                attentionCount: attention.length,
+                total: labResults.length,
+            },
+            medications: {
+                activeCount: meds.length,
+                sampleNames: meds.slice(0, MED_SAMPLE).map((m) => m.name),
+            },
+        };
+    }),
 
     patientVisits: protectedProcedure.query(async ({ ctx }) => {
         const visits = await ctx.clients.OdooAPI.rpc<
