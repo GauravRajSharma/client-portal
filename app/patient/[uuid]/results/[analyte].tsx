@@ -3,158 +3,171 @@ import { ArrowLeft, FlaskConical } from "@tamagui/lucide-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { Text, XStack, YStack } from "tamagui";
 import type { LabResult } from "@/server/dto";
-import { toLabTrends } from "@/server/adapters";
 import {
-  DateText,
+  DLCard,
+  DLScreen,
+  DLStatusPill,
   EmptyState,
   ErrorState,
-  Panel,
-  Screen,
-  Section,
+  LineChart,
+  RangeBar,
   SkeletonList,
-  Sparkline,
-  StatusPill,
-  labStatusMeta,
+  dlStatus,
 } from "@/components/ui";
 import { trpc } from "@/utils/trpc";
-
-function BackBar({ label = "Back to results" }: { label?: string }) {
-  return (
-    <XStack
-      items="center"
-      gap="$2"
-      py="$2.5"
-      minH={44}
-      pressStyle={{ opacity: 0.6 }}
-      hoverStyle={{ opacity: 0.8 }}
-      onPress={() => router.back()}
-      cursor="pointer"
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <ArrowLeft size={18} color="$color10" />
-      <Text fontSize="$3" fontWeight="600" color="$color10">
-        {label}
-      </Text>
-    </XStack>
-  );
-}
-
-/** One row of the points table: date, value+unit, plain-language status. */
-function PointRow({ result, last }: { result: LabResult; last: boolean }) {
-  const meta = labStatusMeta(result.status);
-  return (
-    <YStack>
-      {!last ? <YStack height={1} bg="$borderColor" /> : null}
-      <XStack items="center" justify="space-between" gap="$3" py="$3" px="$1">
-        <DateText value={result.takenAt} color="$color10" />
-        <XStack items="center" gap="$3" flex={1} justify="flex-end">
-          <Text
-            fontSize="$5"
-            fontWeight="700"
-            color={meta.attention ? "$color12" : "$color11"}
-            fontVariant={["tabular-nums"]}
-          >
-            {result.value}
-            {result.unit ? (
-              <Text fontSize="$2" color="$color9">
-                {" "}
-                {result.unit}
-              </Text>
-            ) : null}
-          </Text>
-          <StatusPill
-            label={meta.label}
-            theme={meta.theme}
-            Icon={meta.Icon}
-            size="sm"
-          />
-        </XStack>
-      </XStack>
-    </YStack>
-  );
-}
 
 export default function AnalyteTrend() {
   const { analyte } = useLocalSearchParams<{ uuid: string; analyte: string }>();
   const name = decodeURIComponent(analyte ?? "");
-  const { data, isLoading, isError, refetch } =
-    trpc.patientAllLabResults.useQuery();
+  const { data, isLoading, isError, refetch } = trpc.patientAllLabResults.useQuery();
 
-  // Newest-first for the table; the Sparkline series is built oldest-first by the adapter.
-  const series = useMemo(
-    () => (data ?? []).filter((r) => r.name === name),
-    [data, name],
-  );
+  const series = useMemo(() => (data ?? []).filter((r) => r.name === name), [data, name]);
   const newest = useMemo(
-    () =>
-      [...series].sort((a, b) => {
-        const ta = a.takenAt ? new Date(a.takenAt).getTime() : 0;
-        const tb = b.takenAt ? new Date(b.takenAt).getTime() : 0;
-        return tb - ta;
-      }),
+    () => [...series].sort((a, b) => ((a.takenAt ?? "") > (b.takenAt ?? "") ? -1 : 1)),
     [series],
   );
-  const trend = useMemo(() => toLabTrends(series)[0], [series]);
+  const points = useMemo(
+    () =>
+      [...series]
+        .filter((r) => r.numericValue != null && r.takenAt)
+        .sort((a, b) => (a.takenAt! < b.takenAt! ? -1 : 1))
+        .map((r) => ({
+          label: (r.takenAt ?? "").slice(5, 10),
+          value: r.numericValue as number,
+          color: dlStatus(r.status).color,
+        })),
+    [series],
+  );
 
+  const latest = newest[0];
+  const m = latest ? dlStatus(latest.status) : null;
   const refText =
-    trend?.referenceLow !== undefined && trend?.referenceHigh !== undefined
-      ? `${trend.referenceLow}–${trend.referenceHigh}${trend.unit ? ` ${trend.unit}` : ""}`
+    latest?.referenceLow != null && latest?.referenceHigh != null
+      ? `${latest.referenceLow}–${latest.referenceHigh}${latest.unit ? ` ${latest.unit}` : ""}`
       : undefined;
 
   return (
-    <Screen>
-      <BackBar />
-      <Section title={name || "Trend"}>
-        {isLoading ? (
-          <SkeletonList count={3} />
-        ) : isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : series.length === 0 ? (
-          <EmptyState
-            Icon={FlaskConical}
-            title="No history for this test"
-            detail="We could not find earlier results for this test. It may be your first one."
-          />
-        ) : (
-          <YStack gap="$4">
+    <DLScreen>
+      <XStack items="center" gap="$2" onPress={() => router.back()} pressStyle={{ opacity: 0.6 }}>
+        <ArrowLeft size={18} color="$text2" />
+        <Text fontSize={14} fontWeight="500" color="$text2">
+          Results
+        </Text>
+      </XStack>
+
+      {isLoading ? (
+        <SkeletonList count={3} />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : !latest || !m ? (
+        <EmptyState
+          Icon={FlaskConical}
+          title="No history for this test"
+          detail="We could not find results for this test."
+        />
+      ) : (
+        <YStack gap="$3.5">
+          {/* Hero: latest value + status + range bar */}
+          <DLCard p="$5" gap="$4">
+            <YStack gap="$1">
+              <Text fontSize={13} color="$text2">
+                {name}
+              </Text>
+              <XStack items="flex-end" justify="space-between" gap="$3">
+                <XStack items="baseline" gap="$2">
+                  <Text fontSize={48} fontWeight="700" fontFamily="$mono" color={m.color as any} letterSpacing={-2}>
+                    {latest.value}
+                  </Text>
+                  {latest.unit ? (
+                    <Text fontSize={16} color="$text2" fontWeight="500">
+                      {latest.unit}
+                    </Text>
+                  ) : null}
+                </XStack>
+                <DLStatusPill label={m.label} color={m.color} soft={m.soft} />
+              </XStack>
+            </YStack>
             {refText ? (
-              <Text fontSize="$3" color="$color10">
-                Normal range {refText}. Bars left to right show oldest to newest.
-              </Text>
-            ) : (
-              <Text fontSize="$3" color="$color10">
-                Bars left to right show oldest to newest.
-              </Text>
-            )}
-
-            {trend && trend.points.length > 1 ? (
-              <Panel>
-                <Sparkline
-                  points={trend.points}
-                  height={72}
-                  low={trend.referenceLow}
-                  high={trend.referenceHigh}
+              <YStack gap="$2">
+                <RangeBar
+                  value={latest.numericValue}
+                  low={latest.referenceLow}
+                  high={latest.referenceHigh}
+                  color={m.color}
                 />
-              </Panel>
-            ) : (
-              <Text fontSize="$2" color="$color9">
-                A trend appears once you have more than one result for this test.
-              </Text>
-            )}
+                <XStack justify="space-between">
+                  <Text fontSize={11} color="$text3" fontFamily="$mono">
+                    {latest.referenceLow}
+                  </Text>
+                  <Text fontSize={11} color="$text2">
+                    Normal zone
+                  </Text>
+                  <Text fontSize={11} color="$text3" fontFamily="$mono">
+                    {latest.referenceHigh}
+                  </Text>
+                </XStack>
+              </YStack>
+            ) : null}
+          </DLCard>
 
-            <Panel gap="$1">
-              {newest.map((r, i) => (
-                <PointRow
+          {/* Trend chart */}
+          {points.length > 1 ? (
+            <DLCard p="$4" gap="$2">
+              <Text fontSize={14.5} fontWeight="700" color="$color12">
+                Historical trend
+              </Text>
+              <LineChart
+                points={points}
+                low={latest.referenceLow}
+                high={latest.referenceHigh}
+                height={180}
+              />
+            </DLCard>
+          ) : (
+            <Text fontSize={12.5} color="$text3" px="$1">
+              A trend appears once you have more than one result for this test.
+            </Text>
+          )}
+
+          {/* History */}
+          <DLCard overflow="hidden">
+            <Text fontSize={14.5} fontWeight="700" color="$color12" px="$4" pt="$3.5" pb="$2">
+              Result history
+            </Text>
+            {newest.map((r: LabResult, i) => {
+              const rm = dlStatus(r.status);
+              return (
+                <XStack
                   key={r.id}
-                  result={r}
-                  last={i === newest.length - 1}
-                />
-              ))}
-            </Panel>
-          </YStack>
-        )}
-      </Section>
-    </Screen>
+                  items="center"
+                  justify="space-between"
+                  gap="$3"
+                  px="$4"
+                  py="$3"
+                  borderTopWidth={1}
+                  borderColor="$border"
+                >
+                  <Text fontSize={12.5} color="$text2">
+                    {(r.takenAt ?? "").slice(0, 10)}
+                  </Text>
+                  <XStack items="center" gap="$3">
+                    <Text fontSize={15} fontWeight="600" fontFamily="$mono" color={rm.color as any}>
+                      {r.value}
+                      {r.unit ? (
+                        <Text fontSize={10.5} color="$text3" fontFamily="$body">
+                          {" "}
+                          {r.unit}
+                        </Text>
+                      ) : null}
+                    </Text>
+                    <DLStatusPill label={rm.label} color={rm.color} soft={rm.soft} size="sm" />
+                  </XStack>
+                </XStack>
+              );
+            })}
+          </DLCard>
+        </YStack>
+      )}
+    </DLScreen>
   );
 }
