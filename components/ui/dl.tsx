@@ -292,3 +292,209 @@ export function RecentRow({
     </XStack>
   );
 }
+
+/** Reference range bar: track + green normal zone + colored value marker. */
+export function RangeBar({
+  value,
+  low,
+  high,
+  color,
+}: {
+  value?: number;
+  low?: number;
+  high?: number;
+  color: any;
+}) {
+  if (value == null || low == null || high == null || high <= low) return null;
+  const span = high - low;
+  const min = low - span * 0.25;
+  const max = high + span * 0.25;
+  const clamp = (n: number) => Math.max(0, Math.min(1, (n - min) / (max - min)));
+  const marker = clamp(value) * 100;
+  const zL = clamp(low) * 100;
+  const zW = (clamp(high) - clamp(low)) * 100;
+  return (
+    <YStack height={7} rounded={6} bg="$surface3" position="relative" overflow="hidden">
+      <YStack
+        position="absolute"
+        t={0}
+        b={0}
+        l={`${zL}%`}
+        width={`${zW}%`}
+        bg="$goodSoft"
+        borderLeftWidth={2}
+        borderRightWidth={2}
+        borderColor="$good"
+        opacity={0.85}
+      />
+      <YStack
+        position="absolute"
+        t="50%"
+        l={`${marker}%`}
+        width={13}
+        height={13}
+        rounded={10}
+        bg={color}
+        borderWidth={2.5}
+        borderColor="$surface"
+        y={-6.5}
+        x={-6.5}
+      />
+    </YStack>
+  );
+}
+
+/**
+ * Results list card: colored left edge (status), name + value/pill, range bar + ref.
+ * The colored left edge is intentional in the Deltalab prototype (DESIGN_DELTALAB.md).
+ */
+export function ResultRow({
+  result,
+  onPress,
+}: {
+  result: LabResult;
+  onPress?: () => void;
+}) {
+  const m = dlStatus(result.status);
+  const refText =
+    result.referenceLow != null && result.referenceHigh != null
+      ? `${result.referenceLow}–${result.referenceHigh}${result.unit ? ` ${result.unit}` : ""}`
+      : undefined;
+  return (
+    <YStack
+      bg="$surface"
+      borderWidth={1}
+      borderColor="$border"
+      borderLeftWidth={4}
+      borderLeftColor={m.color as any}
+      rounded={15}
+      px="$3.5"
+      py="$3"
+      gap="$2.5"
+      shadowColor="rgba(16,36,61,0.06)"
+      shadowRadius={5}
+      shadowOffset={{ width: 0, height: 1 }}
+      onPress={onPress}
+      pressStyle={onPress ? { opacity: 0.7 } : undefined}
+    >
+      <XStack items="flex-start" justify="space-between" gap="$3">
+        <YStack flex={1} minW={0}>
+          <Text fontSize={15} fontWeight="600" color="$color12" numberOfLines={2}>
+            {result.name}
+          </Text>
+          {result.panel ? (
+            <Text fontSize={11.5} color="$text2" mt="$0.5">
+              {result.panel}
+            </Text>
+          ) : null}
+        </YStack>
+        <YStack items="flex-end" gap="$1.5">
+          <XStack items="baseline" gap="$1">
+            <Text fontSize={19} fontWeight="700" fontFamily="$mono" color={m.color as any}>
+              {result.value}
+            </Text>
+            {result.unit ? (
+              <Text fontSize={10.5} color="$text3">
+                {result.unit}
+              </Text>
+            ) : null}
+          </XStack>
+          <DLStatusPill label={m.label} color={m.color} soft={m.soft} size="sm" />
+        </YStack>
+      </XStack>
+      {refText ? (
+        <YStack gap="$1.5">
+          <RangeBar
+            value={result.numericValue}
+            low={result.referenceLow}
+            high={result.referenceHigh}
+            color={m.color}
+          />
+          <XStack justify="space-between">
+            <Text fontSize={11} color="$text2">
+              Normal {refText}
+            </Text>
+            {result.takenAt ? (
+              <Text fontSize={11} color="$text2">
+                {result.takenAt.slice(0, 10)}
+              </Text>
+            ) : null}
+          </XStack>
+        </YStack>
+      ) : null}
+    </YStack>
+  );
+}
+
+/** Horizontal scroll filter chips. */
+export function DeptChips({
+  items,
+  value,
+  onChange,
+}: {
+  items: { key: string; label: string }[];
+  value: string;
+  onChange: (key: string) => void;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <XStack gap="$2" px="$0.5">
+        {items.map((t) => {
+          const active = t.key === value;
+          return (
+            <XStack
+              key={t.key}
+              height={36}
+              px="$3.5"
+              items="center"
+              rounded={18}
+              borderWidth={1}
+              borderColor={active ? "$primary" : "$border"}
+              bg={active ? "$primary" : "$surface"}
+              onPress={() => onChange(t.key)}
+              pressStyle={{ opacity: 0.8 }}
+            >
+              <Text fontSize={13} fontWeight="600" color={active ? "$onPrimary" : "$text2"}>
+                {t.label}
+              </Text>
+            </XStack>
+          );
+        })}
+      </XStack>
+    </ScrollView>
+  );
+}
+
+/** AlphaGate: a centered lock card for features not yet available in alpha. */
+export function AlphaGate({
+  Icon,
+  title,
+  detail,
+}: {
+  Icon: NamedExoticComponent<any>;
+  title: string;
+  detail?: string;
+}) {
+  return (
+    <YStack items="center" justify="center" gap="$3" py="$9" px="$5">
+      <YStack width={62} height={62} rounded={18} bg="$primarySoft" items="center" justify="center">
+        <Icon size={28} color="$primary" />
+      </YStack>
+      <XStack items="center" gap="$1.5" bg="$primarySoft" px="$2.5" py="$1" rounded={20}>
+        <Text fontSize={10.5} fontWeight="700" color="$primary" letterSpacing={0.4}>
+          NOT AVAILABLE IN ALPHA
+        </Text>
+      </XStack>
+      <YStack items="center" gap="$1.5" maxW={320}>
+        <Text fontSize={18} fontWeight="700" color="$color12" text="center">
+          {title}
+        </Text>
+        {detail ? (
+          <Text fontSize={13.5} color="$text2" text="center" lineHeight={20}>
+            {detail}
+          </Text>
+        ) : null}
+      </YStack>
+    </YStack>
+  );
+}

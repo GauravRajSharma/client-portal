@@ -1,210 +1,129 @@
 import { useMemo, useState } from "react";
-import { FlaskConical } from "@tamagui/lucide-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import { Text, XStack, YStack, useMedia } from "tamagui";
+import { Search } from "@tamagui/lucide-icons";
+import { router, useGlobalSearchParams } from "expo-router";
+import { Input, Text, XStack, YStack, useMedia } from "tamagui";
+import { trpc } from "@/utils/trpc";
 import type { LabResult } from "@/server/dto";
 import {
-  DateText,
+  DLScreen,
+  DeptChips,
   EmptyState,
   ErrorState,
-  LabValueRow,
-  Panel,
-  Screen,
-  Section,
+  ResultRow,
   SkeletonList,
 } from "@/components/ui";
-import { trpc } from "@/utils/trpc";
-
-const needsAttention = (r: LabResult) =>
-  r.status !== "normal" && r.status !== "unknown";
-
-/** Toggle pill: filter the list down to out-of-range results. */
-function AttentionToggle({
-  on,
-  count,
-  onToggle,
-}: {
-  on: boolean;
-  count: number;
-  onToggle: () => void;
-}) {
-  return (
-    <XStack
-      items="center"
-      gap="$2"
-      px="$3.5"
-      py="$2"
-      minH={40}
-      rounded="$10"
-      borderWidth={1}
-      borderColor={on ? "$accent7" : "$borderColor"}
-      bg={on ? "$accent4" : "transparent"}
-      hoverStyle={{ bg: on ? "$accent5" : "$color2" }}
-      pressStyle={{ opacity: 0.7 }}
-      animation="quick"
-      onPress={onToggle}
-      cursor="pointer"
-      accessibilityRole="switch"
-      accessibilityState={{ checked: on }}
-      accessibilityLabel="Show only results that need attention"
-    >
-      <Text
-        fontSize="$3"
-        fontWeight="700"
-        color={on ? "$accent11" : "$color11"}
-      >
-        Needs attention
-      </Text>
-      {count > 0 ? (
-        <YStack
-          minW={20}
-          height={20}
-          px="$1.5"
-          rounded="$10"
-          items="center"
-          justify="center"
-          bg={on ? "$accent9" : "$color5"}
-        >
-          <Text fontSize={11} fontWeight="800" color={on ? "#fff" : "$color11"}>
-            {count}
-          </Text>
-        </YStack>
-      ) : null}
-    </XStack>
-  );
-}
-
-/** A date heading + the results recorded on that day. */
-function DateGroup({
-  date,
-  results,
-  onOpen,
-}: {
-  date: string;
-  results: LabResult[];
-  onOpen: (r: LabResult) => void;
-}) {
-  const media = useMedia();
-  // Web (>=768): a wrapping two-up grid (reads left-to-right, then down) for density.
-  // Mobile: single stacked list. Wrapping keeps natural reading order, unlike a
-  // round-robin column split.
-  const twoUp = media.md;
-
-  return (
-    <YStack gap="$2.5">
-      <XStack items="center" gap="$2">
-        <DateText value={date} fontWeight="700" color="$color11" />
-        <YStack flex={1} height={1} bg="$borderColor" />
-        <Text fontSize="$2" color="$color9">
-          {results.length} {results.length === 1 ? "result" : "results"}
-        </Text>
-      </XStack>
-      <XStack flexWrap="wrap" gap="$3" justify={twoUp ? "space-between" : "flex-start"}>
-        {results.map((r) => (
-          <YStack key={r.id} width={twoUp ? "48.5%" : "100%"} minW={260} grow={1}>
-            <Panel p="$3" gap={0}>
-              <LabValueRow result={r} onPress={() => onOpen(r)} />
-            </Panel>
-          </YStack>
-        ))}
-      </XStack>
-    </YStack>
-  );
-}
-
-/** Group results by day (most recent first); preserve insertion order within a day. */
-function groupByDay(results: LabResult[]) {
-  const byDay = new Map<string, LabResult[]>();
-  for (const r of results) {
-    const key = r.takenAt ? r.takenAt.slice(0, 10) : "unknown";
-    const list = byDay.get(key) ?? [];
-    list.push(r);
-    byDay.set(key, list);
-  }
-  return [...byDay.entries()]
-    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
-    .map(([day, list]) => ({
-      day,
-      date: list[0]?.takenAt ?? day,
-      results: list,
-    }));
-}
 
 export default function Results() {
-  const { uuid } = useLocalSearchParams<{ uuid: string }>();
-  const [onlyAttention, setOnlyAttention] = useState(false);
-  const { data, isLoading, isError, refetch } =
-    trpc.patientAllLabResults.useQuery();
+  const { uuid } = useGlobalSearchParams<{ uuid: string }>();
+  const media = useMedia();
+  const [filter, setFilter] = useState<"all" | "attention">("all");
+  const [search, setSearch] = useState("");
 
-  const attentionCount = useMemo(
-    () => (data ?? []).filter(needsAttention).length,
-    [data],
-  );
+  const { data, isLoading, isError, refetch } = trpc.patientAllLabResults.useQuery();
 
-  const groups = useMemo(() => {
-    const list = data ?? [];
-    const filtered = onlyAttention ? list.filter(needsAttention) : list;
-    return groupByDay(filtered);
-  }, [data, onlyAttention]);
+  const { groups, total, attentionCount } = useMemo(() => {
+    const all = (data ?? []).slice();
+    const attention = all.filter((r) => r.status !== "normal" && r.status !== "unknown");
+    const q = search.trim().toLowerCase();
+    let rows = filter === "attention" ? attention : all;
+    if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+    rows.sort((a, b) => ((a.takenAt ?? "") > (b.takenAt ?? "") ? -1 : 1));
+    // group by collection date
+    const byDate = new Map<string, LabResult[]>();
+    for (const r of rows) {
+      const k = (r.takenAt ?? "Undated").slice(0, 10);
+      const list = byDate.get(k) ?? [];
+      list.push(r);
+      byDate.set(k, list);
+    }
+    return {
+      groups: Array.from(byDate, ([date, items]) => ({ date, items })),
+      total: all.length,
+      attentionCount: attention.length,
+    };
+  }, [data, filter, search]);
 
-  const openTrend = (r: LabResult) =>
-    router.push(
-      `/patient/${uuid}/results/${encodeURIComponent(r.name)}` as any,
-    );
-
-  const total = data?.length ?? 0;
+  const open = (r: LabResult) =>
+    router.push(`/patient/${uuid}/results/${encodeURIComponent(r.name)}` as any);
 
   return (
-    <Screen>
-      <Section
-        title="Lab results"
-        action={
-          total > 0 ? (
-            <AttentionToggle
-              on={onlyAttention}
-              count={attentionCount}
-              onToggle={() => setOnlyAttention((v) => !v)}
-            />
-          ) : null
-        }
+    <DLScreen>
+      <XStack
+        items="center"
+        gap="$2.5"
+        bg="$surface"
+        borderWidth={1}
+        borderColor="$borderStrong"
+        rounded={14}
+        px="$3.5"
+        height={48}
       >
-        {total > 0 ? (
-          <Text fontSize="$3" color="$color10">
-            {attentionCount > 0
-              ? `${attentionCount} of ${total} need a closer look. Tap any result to see how it has changed over time.`
-              : `All ${total} of your results are in the normal range. Tap any result to see its trend.`}
-          </Text>
-        ) : null}
+        <Search size={18} color="$text3" />
+        <Input
+          unstyled
+          flex={1}
+          fontSize={14.5}
+          color="$color12"
+          placeholder="Search by test name…"
+          placeholderTextColor="$text3"
+          value={search}
+          onChangeText={setSearch}
+        />
+      </XStack>
 
-        {isLoading ? (
-          <SkeletonList count={5} />
-        ) : isError ? (
-          <ErrorState onRetry={() => refetch()} />
-        ) : total === 0 ? (
-          <EmptyState
-            Icon={FlaskConical}
-            title="No results yet"
-            detail="When the lab finishes your tests, your results will appear here, newest first."
-          />
-        ) : onlyAttention && groups.length === 0 ? (
-          <EmptyState
-            Icon={FlaskConical}
-            title="Nothing needs attention"
-            detail="None of your results are outside their normal range right now."
-          />
-        ) : (
-          <YStack gap="$5">
-            {groups.map((g) => (
-              <DateGroup
-                key={g.day}
-                date={g.date}
-                results={g.results}
-                onOpen={openTrend}
-              />
-            ))}
-          </YStack>
-        )}
-      </Section>
-    </Screen>
+      <DeptChips
+        items={[
+          { key: "all", label: `All ${total}` },
+          { key: "attention", label: `Needs attention ${attentionCount}` },
+        ]}
+        value={filter}
+        onChange={(k) => setFilter(k as "all" | "attention")}
+      />
+
+      {isError ? (
+        <ErrorState
+          title="Couldn't load your results"
+          detail="Please try again in a moment."
+          onRetry={() => refetch()}
+        />
+      ) : isLoading ? (
+        <SkeletonList count={5} />
+      ) : groups.length === 0 ? (
+        <EmptyState
+          Icon={Search}
+          title={search || filter === "attention" ? "Nothing matches" : "No results yet"}
+          detail={
+            search || filter === "attention"
+              ? "Try a different search or filter."
+              : "When the lab finishes your tests, results appear here."
+          }
+        />
+      ) : (
+        <YStack gap="$5">
+          {groups.map((g) => (
+            <YStack key={g.date} gap="$2.5">
+              <XStack items="center" justify="space-between" px="$0.5">
+                <Text fontSize={15} fontWeight="700" color="$color12">
+                  {g.date}
+                </Text>
+                <Text fontSize={12} color="$text2">
+                  {g.items.length} result{g.items.length > 1 ? "s" : ""}
+                </Text>
+              </XStack>
+              <YStack
+                gap="$2.5"
+                {...(media.md ? { flexDirection: "row", flexWrap: "wrap" } : {})}
+              >
+                {g.items.map((r) => (
+                  <YStack key={r.id} {...(media.md ? { width: "48.5%" } : {})}>
+                    <ResultRow result={r} onPress={() => open(r)} />
+                  </YStack>
+                ))}
+              </YStack>
+            </YStack>
+          ))}
+        </YStack>
+      )}
+    </DLScreen>
   );
 }
