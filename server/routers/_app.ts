@@ -65,7 +65,10 @@ const hospitals = [
     { prefix: "RUPA", server: "rupa" },
 ];
 
-const JWT_VERIFICATION_KEY = "super secret token put this in env";
+import { JWT_SECRET } from "../config/env";
+
+// Secret now comes from the environment (server/config/env.ts), not source.
+const JWT_VERIFICATION_KEY = JWT_SECRET;
 // --
 
 type TAuthData = {
