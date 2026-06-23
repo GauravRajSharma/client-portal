@@ -141,6 +141,32 @@ export interface Bill {
   insurance?: InsuranceCoverage;
 }
 
+/**
+ * PatientOverview — a read-only aggregate for the Home screen. It composes data the
+ * patient most needs at a glance, so Home makes one call instead of fanning out:
+ *  - latest visit
+ *  - the lab results currently worth their attention (out of range), with a total
+ *  - how many medicines are active, with a few names to recognise
+ *
+ * Each field is derived from an existing read-only backend call via the adapters.
+ */
+export interface PatientOverview {
+  latestVisit?: Visit;
+  labs: {
+    /** results out of reference range, most recent first, capped for the summary */
+    attention: LabResult[];
+    /** how many results are out of range in total (attention may be truncated) */
+    attentionCount: number;
+    /** total results we have on record */
+    total: number;
+  };
+  medications: {
+    activeCount: number;
+    /** a few active medicine names, for recognition */
+    sampleNames: string[];
+  };
+}
+
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";
 
 export interface PatientDocument {
