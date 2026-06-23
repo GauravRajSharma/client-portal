@@ -1,4 +1,4 @@
-import { Text, XStack, YStack } from "tamagui";
+import { Text, Theme, XStack, YStack } from "tamagui";
 import type { LabResult, LabTrendPoint } from "@/server/dto";
 import { labStatusMeta } from "./status";
 import { Row, StatusPill } from "./primitives";
@@ -11,11 +11,13 @@ function RangeBar({
   value,
   low,
   high,
+  theme,
   attention,
 }: {
   value?: number;
   low?: number;
   high?: number;
+  theme: "success" | "warning" | "error" | "accent" | "neutral";
   attention: boolean;
 }) {
   if (value === undefined || low === undefined || high === undefined || high <= low) {
@@ -30,24 +32,35 @@ function RangeBar({
   const bandLeft = clamp(low) * 100;
   const bandWidth = (clamp(high) - clamp(low)) * 100;
 
-  return (
-    <YStack height={6} bg="$color3" rounded="$10" overflow="hidden" position="relative">
+  // The marker carries the status: in-range reads calm and dark; out-of-range is
+  // pulled into the status theme and made taller/wider so it is the first thing seen.
+  const marker = (
+    <YStack height={10} bg="$color3" rounded="$10" overflow="hidden" position="relative">
+      {/* the "normal" band, so a patient can see where in-range sits */}
       <YStack
         position="absolute"
-        height="100%"
+        t={3}
+        height={4}
         l={`${bandLeft}%`}
         width={`${bandWidth}%`}
-        bg="$color5"
+        rounded="$10"
+        bg="$color6"
       />
       <YStack
         position="absolute"
         height="100%"
-        width={3}
+        width={attention ? 4 : 3}
         l={`${markerPct}%`}
-        bg={attention ? "$color9" : "$color11"}
+        rounded="$10"
+        bg={attention ? "$color10" : "$color12"}
       />
     </YStack>
   );
+
+  if (attention && theme !== "neutral") {
+    return <Theme name={theme}>{marker}</Theme>;
+  }
+  return marker;
 }
 
 /**
@@ -68,41 +81,41 @@ export function LabValueRow({
       : undefined;
 
   return (
-    <Row onPress={onPress} flexDirection="column" items="stretch" gap="$2">
+    <Row onPress={onPress} flexDirection="column" items="stretch" gap="$2.5" minH={64}>
       <XStack items="flex-start" justify="space-between" gap="$3">
-        <YStack flex={1} gap="$1">
+        <YStack flex={1} gap="$2">
+          {/* Status first: plain-language verdict leads, before the number. */}
+          <StatusPill label={meta.label} theme={meta.theme} Icon={meta.Icon} size="sm" />
           <Text fontSize="$4" fontWeight="600" color="$color12" numberOfLines={2}>
             {result.name}
           </Text>
           {refText ? (
             <Text fontSize="$2" color="$color9">
-              Reference {refText}
+              Normal {refText}
             </Text>
           ) : null}
         </YStack>
-        <YStack items="flex-end" gap="$1.5">
-          <XStack items="baseline" gap="$1">
-            <Text
-              fontSize="$8"
-              fontWeight="800"
-              color={meta.attention ? "$color12" : "$color11"}
-              fontVariant={["tabular-nums"]}
-            >
-              {result.value}
+        <XStack items="baseline" gap="$1">
+          <Text
+            fontSize="$8"
+            fontWeight="800"
+            color={meta.attention ? "$color12" : "$color11"}
+            fontVariant={["tabular-nums"]}
+          >
+            {result.value}
+          </Text>
+          {result.unit ? (
+            <Text fontSize="$2" color="$color9">
+              {result.unit}
             </Text>
-            {result.unit ? (
-              <Text fontSize="$2" color="$color9">
-                {result.unit}
-              </Text>
-            ) : null}
-          </XStack>
-          <StatusPill label={meta.label} theme={meta.theme} Icon={meta.Icon} size="sm" />
-        </YStack>
+          ) : null}
+        </XStack>
       </XStack>
       <RangeBar
         value={result.numericValue}
         low={result.referenceLow}
         high={result.referenceHigh}
+        theme={meta.theme}
         attention={meta.attention}
       />
     </Row>
@@ -128,27 +141,49 @@ export function Sparkline({
 }) {
   if (!points.length) return null;
   const values = points.map((p) => p.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  // Include the reference range in the vertical scale so the "normal" band is
+  // always visible, even when every reading sits inside it.
+  const lo = Math.min(...values, ...(low !== undefined ? [low] : []));
+  const hi = Math.max(...values, ...(high !== undefined ? [high] : []));
+  const min = lo;
+  const max = hi;
   const range = max - min || 1;
   const inRange = (v: number) =>
     (low === undefined || v >= low) && (high === undefined || v <= high);
+  const yPct = (v: number) => ((v - min) / range) * 100;
+
+  const showBand = low !== undefined && high !== undefined;
+  const bandBottom = showBand ? yPct(low as number) : 0;
+  const bandHeight = showBand ? yPct(high as number) - bandBottom : 0;
 
   return (
-    <XStack height={height} items="flex-end" gap={2}>
-      {points.map((p, i) => {
-        const h = 4 + ((p.value - min) / range) * (height - 4);
-        return (
-          <YStack
-            key={i}
-            flex={1}
-            height={h}
-            minW={3}
-            rounded="$2"
-            bg={inRange(p.value) ? "$color7" : "$color10"}
-          />
-        );
-      })}
-    </XStack>
+    <YStack height={height} position="relative">
+      {showBand ? (
+        <YStack
+          position="absolute"
+          l={0}
+          r={0}
+          b={`${bandBottom}%`}
+          height={`${bandHeight}%`}
+          bg="$color4"
+          rounded="$2"
+        />
+      ) : null}
+      <XStack height="100%" items="flex-end" gap={2}>
+        {points.map((p, i) => {
+          const h = 4 + ((p.value - min) / range) * (height - 4);
+          return (
+            <YStack
+              key={i}
+              flex={1}
+              height={h}
+              minW={3}
+              rounded="$2"
+              bg={inRange(p.value) ? "$color8" : "$color11"}
+            />
+          );
+        })}
+      </XStack>
+    </YStack>
   );
 }

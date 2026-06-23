@@ -9,6 +9,7 @@
 import type {
   LabResult,
   LabStatus,
+  LabTrend,
   Medication,
   Patient,
   Practitioner,
@@ -124,7 +125,7 @@ export function computeLabStatus(
   return "normal";
 }
 
-export function toLabResult(raw: any, meta: any): LabResult {
+export function toLabResult(raw: any, meta: any, panel?: string): LabResult {
   const numeric = num(raw?.value);
   const m = {
     lowNormal: num(meta?.lowNormal),
@@ -144,7 +145,51 @@ export function toLabResult(raw: any, meta: any): LabResult {
     criticalHigh: m.hiCritical,
     status: computeLabStatus(numeric, m),
     takenAt: str(raw?.create_date),
+    panel: str(panel),
   };
+}
+
+/**
+ * Build per-analyte trends from a flat list of LabResult. Groups by analyte `name`,
+ * keeps only points with a numeric value and a date, and sorts oldest -> newest so a
+ * Sparkline reads left (past) to right (latest). Reference range is taken from the most
+ * recent point (ranges rarely drift; the latest is the most relevant to the patient).
+ */
+export function toLabTrends(results: LabResult[]): LabTrend[] {
+  const groups = new Map<string, LabResult[]>();
+  for (const r of results) {
+    if (!r.name) continue;
+    const list = groups.get(r.name) ?? [];
+    list.push(r);
+    groups.set(r.name, list);
+  }
+
+  const trends: LabTrend[] = [];
+  for (const [name, list] of groups) {
+    const sorted = [...list].sort(
+      (a, b) => dateMs(a.takenAt) - dateMs(b.takenAt),
+    );
+    const points = sorted
+      .filter((r) => r.numericValue !== undefined && r.takenAt)
+      .map((r) => ({ date: r.takenAt as string, value: r.numericValue as number }));
+    if (!points.length) continue;
+    const latest = sorted[sorted.length - 1];
+    trends.push({
+      name,
+      unit: latest.unit,
+      referenceLow: latest.referenceLow,
+      referenceHigh: latest.referenceHigh,
+      points,
+    });
+  }
+  return trends;
+}
+
+/** Parse a loose date to epoch ms; undefined/bad dates sort to the start. */
+function dateMs(iso?: string): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
 }
 
 export function toMedication(raw: any): Medication {
