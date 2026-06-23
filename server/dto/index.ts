@@ -132,7 +132,15 @@ export interface InsuranceCoverage {
 }
 
 export interface Bill {
+  /** Stable id for keys/grouping (invoice id, falls back to number). */
+  id?: string;
   visitId?: string;
+  /** Human invoice number, e.g. "INV/2026/00123". */
+  number?: string;
+  /** ISO/display date the invoice was issued. */
+  date?: string;
+  /** Plain-language settlement status, e.g. "Settled", "Awaiting settlement". */
+  paymentStatus?: string;
   currency: string; // "NPR"
   total: number;
   paid: number;

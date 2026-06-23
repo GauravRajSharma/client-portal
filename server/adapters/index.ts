@@ -7,6 +7,9 @@
  */
 
 import type {
+  Bill,
+  BillLine,
+  InsuranceCoverage,
   LabResult,
   LabStatus,
   LabTrend,
@@ -24,14 +27,20 @@ const num = (v: unknown): number | undefined => {
 };
 
 const str = (v: unknown): string | undefined =>
-  v === false || v === null || v === undefined || v === "" ? undefined : String(v);
+  v === false || v === null || v === undefined || v === ""
+    ? undefined
+    : String(v);
 
 /** Normalize Odoo's `false`-for-empty into clean strings. */
 export function clean<T extends string | undefined>(v: unknown): T {
   return str(v) as T;
 }
 
-export function toPatient(raw: any, hospitalName?: string, hospitalCode?: string): Patient {
+export function toPatient(
+  raw: any,
+  hospitalName?: string,
+  hospitalCode?: string,
+): Patient {
   return {
     id: String(raw?.uuid ?? ""),
     mrn: String(raw?.ref ?? ""),
@@ -69,7 +78,10 @@ export function toVisit(raw: any, doctorRaw?: any): Visit {
   const parts = String(raw?.display_name ?? "")
     .split("—")
     .map((s) => s.trim());
-  const vt = VISIT_TYPES[raw?.visit_type] ?? { type: "OTHER" as const, label: "Visit" };
+  const vt = VISIT_TYPES[raw?.visit_type] ?? {
+    type: "OTHER" as const,
+    label: "Visit",
+  };
   return {
     id: String(raw?.external_uuid ?? raw?.id ?? ""),
     type: vt.type,
@@ -135,7 +147,9 @@ export function toLabResult(raw: any, meta: any, panel?: string): LabResult {
   };
   return {
     id: String(raw?.id ?? ""),
-    name: Array.isArray(raw?.lab_item) ? String(raw.lab_item[1]) : String(raw?.name ?? ""),
+    name: Array.isArray(raw?.lab_item)
+      ? String(raw.lab_item[1])
+      : String(raw?.name ?? ""),
     value: String(raw?.value ?? ""),
     numericValue: numeric,
     unit: str(meta?.units),
@@ -214,5 +228,137 @@ export function toMedication(raw: any): Medication {
     refills: num(raw?.numRefills),
     instructions: str(raw?.dosingInstructions) ?? str(raw?.instructions),
     active: raw?.action !== "DISCONTINUE",
+  };
+}
+
+/* ---------------------------------------------------------------------------
+ * Billing & insurance (read-only).
+ *
+ * Sources (Odoo, all read via search_read):
+ *   account.move        — the invoice: amount_total, amount_residual (due),
+ *                         payment_state, state, invoice_date, name, claim_code,
+ *                         care_type. Filtered by partner_id.uuid = patient.
+ *   account.move.line   — itemized lines: name, quantity, price_unit,
+ *                         price_subtotal, price_total, product_id.
+ *   who.insurance.claim_code_audit — links a move to its patient.visit and
+ *                         carries the claim_code / nhis_number for context.
+ *
+ * Money note: account.move.amount_total/amount_residual are stored as POSITIVE
+ * on customer invoices (out_invoice). amount_paid is derived as total - residual.
+ * Coverage is presented conservatively: what is already settled vs what the
+ * patient still owes. We do NOT invent insurer-approved amounts the backend has
+ * not confirmed; the view degrades to showing what is known.
+ * ------------------------------------------------------------------------- */
+
+/** Clamp a maybe-number to a finite, non-negative amount (defaulting to 0). */
+const money = (v: unknown): number => {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+};
+
+/** A many2one in Odoo RPC comes back as [id, "Display Name"] or false. */
+const m2oLabel = (v: unknown): string | undefined =>
+  Array.isArray(v) && v.length >= 2 ? str(v[1]) : undefined;
+
+/**
+ * Human-readable insurance scheme label. The system only speaks one insurer
+ * family today (Nepal's National Health Insurance, run by the Health Insurance
+ * Board), so we present a stable, layperson label rather than leaking internal
+ * policy codes like "HIB-3500".
+ */
+const SCHEME_LABEL = "National Health Insurance (HIB)";
+
+export function toBillLine(raw: any): BillLine {
+  const qty = num(raw?.quantity);
+  const unit = num(raw?.price_unit);
+  // Prefer tax-inclusive total so the line amounts reconcile with the bill total.
+  const amount = money(raw?.price_total ?? raw?.price_subtotal);
+  return {
+    description: str(raw?.name) ?? m2oLabel(raw?.product_id) ?? "Charge",
+    quantity: qty,
+    unitPrice: unit,
+    amount,
+    category: m2oLabel(raw?.product_id),
+  };
+}
+
+/**
+ * Build the insurance coverage block for one invoice, when there is any signal
+ * that insurance is involved (a claim code, or the patient carries an NHIS id).
+ * Returns undefined for a plain cash bill so the UI shows no coverage block.
+ *
+ * covered        = what has been settled against the bill (total - due).
+ * patientPayable = what the patient still owes (the residual).
+ * This is the honest, backend-confirmed split; insurer-approved valuations are
+ * not reliably persisted at view time, so we do not fabricate them.
+ */
+export function toInsuranceCoverage(
+  invoiceRaw: any,
+  opts: { nhisNumber?: string; total: number; due: number },
+): InsuranceCoverage | undefined {
+  const claimCode = str(invoiceRaw?.claim_code);
+  const hasInsuranceSignal = Boolean(claimCode) || Boolean(opts.nhisNumber);
+  if (!hasInsuranceSignal) return undefined;
+
+  const covered = Math.max(0, opts.total - opts.due);
+  return {
+    scheme: SCHEME_LABEL,
+    number: opts.nhisNumber,
+    claimCode,
+    covered,
+    patientPayable: opts.due,
+    status: str(invoiceRaw?.payment_state)
+      ? paymentStateLabel(invoiceRaw.payment_state)
+      : undefined,
+  };
+}
+
+/** Plain-language label for Odoo's account.move.payment_state. */
+export function paymentStateLabel(state: unknown): string {
+  switch (String(state)) {
+    case "paid":
+      return "Settled";
+    case "in_payment":
+      return "Payment in progress";
+    case "partial":
+      return "Partially settled";
+    case "reversed":
+      return "Reversed";
+    case "not_paid":
+      return "Awaiting settlement";
+    default:
+      return "—";
+  }
+}
+
+/**
+ * Map one Odoo invoice (+ its lines) to a Bill DTO. Tolerant of `false`-empties
+ * and missing lines; never throws on shape drift.
+ */
+export function toBill(
+  invoiceRaw: any,
+  lineRaws: any[] | undefined,
+  opts: { nhisNumber?: string; visitId?: string } = {},
+): Bill {
+  const total = money(invoiceRaw?.amount_total);
+  const due = money(invoiceRaw?.amount_residual);
+  const paid = Math.max(0, total - due);
+  const lines = Array.isArray(lineRaws) ? lineRaws.map(toBillLine) : [];
+  return {
+    id: str(invoiceRaw?.id) ?? str(invoiceRaw?.name),
+    visitId: opts.visitId ?? str(invoiceRaw?.name),
+    number: str(invoiceRaw?.name),
+    date: str(invoiceRaw?.invoice_date) ?? str(invoiceRaw?.date),
+    paymentStatus: paymentStateLabel(invoiceRaw?.payment_state),
+    currency: str(invoiceRaw?.currency_id?.[1]) === "USD" ? "USD" : "NPR",
+    total,
+    paid,
+    due,
+    lines,
+    insurance: toInsuranceCoverage(invoiceRaw, {
+      nhisNumber: opts.nhisNumber,
+      total,
+      due,
+    }),
   };
 }

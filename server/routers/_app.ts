@@ -13,6 +13,8 @@ import { toVisit, toVisitDetail } from "../adapters";
 import type { Visit, VisitDetail } from "../dto";
 import { toLabResult } from "../adapters";
 import type { LabResult } from "../dto";
+import { toBill } from "../adapters";
+import type { Bill } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -526,6 +528,116 @@ export const appRouter = router({
             const doctor = await fetchVisitDoctor(ctx, raw.diagnosis_by?.[0]);
             return toVisitDetail(raw, doctor);
         }),
+     * patientBills — read-only billing & insurance view.
+     *
+     * Identity is taken from the verified token (ctx.auth.uuid); the URL is never
+     * trusted. Returns one Bill per Odoo customer invoice (account.move) for this
+     * patient, each with itemized lines (account.move.line) and an insurance
+     * coverage block when there is any insurance signal (a claim code on the
+     * invoice, or the patient carries an NHIS number).
+     *
+     * This is a pure projection of what the patient owes / was covered. It calls
+     * ONLY read endpoints (search_read) and never posts, pays, or mutates.
+     */
+    patientBills: protectedProcedure.query(async ({ ctx }): Promise<Bill[]> => {
+        // The patient's NHIS / insurance number, for the coverage block. Best
+        // effort; tolerate it being absent.
+        let nhisNumber: string | undefined;
+        try {
+            const partners = await ctx.clients.OdooAPI.rpc<
+                { nhis_number: string | false }[]
+            >({
+                model: "res.partner",
+                method: "search_read",
+                args: [[["uuid", "=", ctx.auth.uuid]]],
+                kwargs: { fields: ["nhis_number"], limit: 1 },
+            });
+            const raw = partners?.[0]?.nhis_number;
+            nhisNumber = raw && raw !== "" ? String(raw) : undefined;
+        } catch {
+            nhisNumber = undefined;
+        }
+
+        // Customer invoices for this patient, newest first. Positive amounts.
+        const invoices = await ctx.clients.OdooAPI.rpc<
+            {
+                id: number;
+                name: string | false;
+                invoice_date: string | false;
+                date: string | false;
+                amount_total: number;
+                amount_residual: number;
+                payment_state: string | false;
+                state: string | false;
+                claim_code: string | false;
+                care_type: string | false;
+                currency_id: [number, string] | false;
+            }[]
+        >({
+            model: "account.move",
+            method: "search_read",
+            args: [
+                [
+                    ["partner_id.uuid", "=", ctx.auth.uuid],
+                    ["move_type", "=", "out_invoice"],
+                    ["state", "!=", "cancel"],
+                ],
+            ],
+            kwargs: {
+                fields: [
+                    "id",
+                    "name",
+                    "invoice_date",
+                    "date",
+                    "amount_total",
+                    "amount_residual",
+                    "payment_state",
+                    "state",
+                    "claim_code",
+                    "care_type",
+                    "currency_id",
+                ],
+                order: "invoice_date desc, id desc",
+            },
+        });
+
+        if (!Array.isArray(invoices) || invoices.length === 0) return [];
+
+        // Itemized lines per invoice. Skip note/section/subtotal rows
+        // (display_type set) so the patient sees real charges only.
+        return Promise.all(
+            invoices.map(async (inv) => {
+                let lines: any[] = [];
+                try {
+                    lines = await ctx.clients.OdooAPI.rpc<any[]>({
+                        model: "account.move.line",
+                        method: "search_read",
+                        args: [
+                            [
+                                ["move_id", "=", inv.id],
+                                ["display_type", "=", false],
+                                ["exclude_from_invoice_tab", "=", false],
+                            ],
+                        ],
+                        kwargs: {
+                            fields: [
+                                "name",
+                                "quantity",
+                                "price_unit",
+                                "price_subtotal",
+                                "price_total",
+                                "product_id",
+                            ],
+                            order: "sequence asc, id asc",
+                        },
+                    });
+                } catch {
+                    lines = [];
+                }
+                return toBill(inv, lines, { nhisNumber });
+            }),
+        );
+    }),
 });
 
 type RawVisit = {
