@@ -5,27 +5,36 @@ ships as an independent PR against `ehrplus/main` for review. See PRODUCT.md / D
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started · 🔍 in review
 
-## Foundation (PR: `redesign/foundation`)
+## Foundation (PR #1: `redesign/foundation`) — 🔍 in review
 
-- 🟡 Clinical Slate Tamagui theme (palettes recolored)
-- 🟡 PRODUCT.md / DESIGN.md / PROGRESS.md
-- ⬜ DTO layer (`server/dto/`) + adapters (`server/adapters/`)
-- ⬜ Security: JWT secret → env, read-only invariant documented + enforced
-- ⬜ Shared UI primitives (`components/ui/`): Screen, AppHeader, StatusPill, LabValueRow, Sparkline, Money, EmptyState, Skeleton, ErrorState, IdentityChip
-- ⬜ Responsive NavShell (mobile bottom tabs / web sidebar)
+- ✅ Clinical Slate Tamagui theme (palettes recolored)
+- ✅ PRODUCT.md / DESIGN.md / PROGRESS.md
+- ✅ DTO layer (`server/dto/`) + adapters (`server/adapters/`) + unit tests
+- ✅ Security: JWT secret → env, read-only invariant documented + enforced
+- ✅ Shared UI primitives (`components/ui/`): Screen, Section, Panel, Row, StatusPill, LabValueRow, Sparkline, Money, EmptyState, Skeleton, ErrorState, IdentityChip
+- ✅ Responsive NavShell (mobile bottom tabs / web sidebar)
 
-## Feature PRs (each branched off foundation)
+## Feature PRs (each branched off foundation) — all 🔍 in review
 
-| Feature | Branch | Status | Notes |
+| Feature | Branch | PR | Status |
 |---|---|---|---|
-| Auth (login, verify, hospital select, QR) | `redesign/auth` | ⬜ | harden + restyle |
-| Home / overview dashboard | `redesign/home` | ⬜ | at-a-glance: next visit, results needing attention, active meds, balance |
-| Visits (list + detail) | `redesign/visits` | ⬜ | OPD/IPD/ER filter, drill-in |
-| Lab results (+ trends) | `redesign/labs` | ⬜ | status-first, reference ranges, sparkline trend per analyte |
-| Medications + prescriptions | `redesign/meds` | ⬜ | active meds, per-visit prescription |
-| Billing + insurance (read-only) | `redesign/billing` | ⬜ | who_insurance addon; balance, itemized, NHIS coverage |
-| Profile + hospital info + i18n (EN/NE) | `redesign/profile` | ⬜ | demographics, language toggle |
-| Documents (PDF view/share) | `redesign/documents` | ⬜ | bridge summary/report PDFs |
+| Auth (login, verify, hospital select, QR) | `redesign/auth` | #7 | 🔍 |
+| Home / overview dashboard | `redesign/home` | #4 | 🔍 |
+| Visits (list + detail) | `redesign/visits` | #5 | 🔍 |
+| Lab results (+ trends) | `redesign/labs` | #6 | 🔍 |
+| Medications + prescriptions | `redesign/meds` | #3 | 🔍 |
+| Billing + insurance (read-only) | `redesign/billing` | #8 | 🔍 |
+| Profile + hospital info + i18n (EN/NE) | `redesign/profile` | #9 | 🔍 |
+| Documents (PDF view/share) | `redesign/documents` | #2 | 🔍 |
+
+## Integration notes (to resolve when merging)
+
+- `server/routers/_app.ts` is touched by 6 PRs → expect merge conflicts (each adds/edits its own
+  `.query`). Land foundation first, then merge features one by one.
+- `redesign/profile` changes the `patient` query to return the `Patient` DTO and updates its
+  consumers (`index.tsx`, `visits.tsx`). Home/visits on other branches still read the raw shape —
+  reconcile the `patient` query shape during integration so every consumer uses the DTO.
+- Runtime verification against a live hospital (read-only) + screenshots: pending an integration branch.
 
 ## Quality bar
 
