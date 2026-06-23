@@ -188,7 +188,7 @@ function PatientCard() {
               icon={PillBottle}
               onPress={() =>
                 // @ts-ignore
-                router.push(`/patient/${data?.uuid}/active-medications`)
+                router.push(`/patient/${data?.uuid}/meds`)
               }
             >
               View Active Medications
