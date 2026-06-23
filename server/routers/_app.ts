@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { toMedication } from "../adapters";
+import type { Medication, Prescription } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -325,31 +327,34 @@ export const appRouter = router({
 
         return patients?.[0];
     }),
-    patientActiveMedications: protectedProcedure.query(async ({ ctx }) => {
-        const response = await ctx.clients.OpenmrsAPI<{
-            results: Array<TActiveMedicationOrder>;
-        }>("order", {
-            query: {
-                patient: ctx.auth.uuid,
-                careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
-                // status: "ACTIVE",
-                orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
-                v: `custom:(${customFields.medications})`,
-            },
-        });
+    patientActiveMedications: protectedProcedure.query(
+        async ({ ctx }): Promise<Medication[]> => {
+            const response = await ctx.clients.OpenmrsAPI<{
+                results: Array<TActiveMedicationOrder>;
+            }>("order", {
+                query: {
+                    patient: ctx.auth.uuid,
+                    careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+                    // status: "ACTIVE",
+                    orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+                    v: `custom:(${customFields.medications})`,
+                },
+            });
 
-        return response.results;
-    }),
+            // Speak DTOs, not raw OpenMRS shapes. Mapping lives in adapters.
+            return (response.results ?? []).map(toMedication);
+        },
+    ),
 
     patientPrescription: protectedProcedure
         .input(z.object({ visit: z.string() }))
-        .query(async ({ ctx, input }) => {
+        .query(async ({ ctx, input }): Promise<Prescription> => {
             const html = await ctx.clients.BridgeApi<string>(
                 `/summary/${ctx.auth.uuid}/${input.visit}?mode=visit&format=html`,
             );
             const cleanedHtml = html.replace(/<img\b[^>]*>/gi, "");
 
-            return cleanedHtml;
+            return { visitId: input.visit, html: cleanedHtml };
         }),
 
     patientLabResults: protectedProcedure
