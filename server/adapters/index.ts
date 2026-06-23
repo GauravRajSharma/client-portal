@@ -13,6 +13,7 @@ import type {
   Patient,
   Practitioner,
   Visit,
+  VisitDetail,
   VisitType,
 } from "../dto";
 
@@ -78,6 +79,25 @@ export function toVisit(raw: any, doctorRaw?: any): Visit {
     paymentType: str(raw?.payment_type) ?? str(parts[2]),
     paymentMethod: str(raw?.payment_method) ?? str(parts[3]),
     status: raw?.manual_close_visit ? "closed" : "open",
+  };
+}
+
+/**
+ * Visit + the extra context a detail screen wants (diagnoses, counts). Builds on
+ * toVisit so the base fields stay identical between list and detail.
+ */
+export function toVisitDetail(raw: any, doctorRaw?: any): VisitDetail {
+  const base = toVisit(raw, doctorRaw);
+  const diagnoses = Array.isArray(raw?.diagnoses)
+    ? raw.diagnoses
+        .map((d: any) =>
+          Array.isArray(d) ? str(d[1]) : str(d?.name ?? d?.display ?? d),
+        )
+        .filter((d: string | undefined): d is string => Boolean(d))
+    : undefined;
+  return {
+    ...base,
+    diagnoses: diagnoses && diagnoses.length ? diagnoses : undefined,
   };
 }
 
