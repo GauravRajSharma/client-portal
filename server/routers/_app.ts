@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { toVisit, toVisitDetail } from "../adapters";
+import type { Visit, VisitDetail } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -399,65 +401,102 @@ export const appRouter = router({
             );
         }),
 
-    patientVisits: protectedProcedure.query(async ({ ctx }) => {
-        const visits = await ctx.clients.OdooAPI.rpc<
-            {
-                external_uuid: string;
-                id: string;
-                display_name: string;
-                department: string;
-                manual_close_visit: boolean;
-                visit_type: string;
-                diagnosis_by: number[];
-            }[]
-        >({
-            model: "patient.visit",
-            method: "search_read",
-            args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
-            kwargs: {
-                fields: [
-                    "external_uuid",
-                    "id",
-                    "display_name",
-                    "diagnosis_by",
-                    "department",
-                    "payment_type",
-                    "payment_method",
-                    "manual_close_visit",
-                    "visit_type",
-                ],
-                order: "create_date desc",
-            },
-        });
+    /**
+     * Returns app-owned Visit[] DTOs (see server/dto). The UI never sees raw Odoo
+     * fields; mapping lives in toVisit/toPractitioner. Newest visit first.
+     */
+    patientVisits: protectedProcedure.query(async ({ ctx }): Promise<Visit[]> => {
+        const visits = await fetchRawVisits(ctx);
 
         return Promise.all(
             visits.map(async (visit) => {
-                const doctor = await ctx.clients.OdooAPI.rpc<
-                    {
-                        name: string;
-                        id: number;
-                        license_number: string;
-                        specialized_title: string;
-                    }[]
-                >({
-                    model: "emr.practitioner",
-                    method: "search_read",
-                    args: [[["id", "=", visit.diagnosis_by?.[0]]]],
-                    kwargs: {
-                        fields: [
-                            "name",
-                            "id",
-                            "license_number",
-                            "specialized_title",
-                        ],
-                        limit: 1,
-                    },
-                });
-                return { ...visit, doctor: doctor?.[0] };
+                const doctor = await fetchVisitDoctor(ctx, visit.diagnosis_by?.[0]);
+                return toVisit(visit, doctor);
             }),
         );
     }),
+
+    /**
+     * A single visit as a VisitDetail DTO (adds diagnoses on top of Visit). Identity
+     * is the token's uuid; the visit's external_uuid scopes the lookup. Read-only.
+     */
+    patientVisit: protectedProcedure
+        .input(z.object({ visit: z.string() }))
+        .query(async ({ ctx, input }): Promise<VisitDetail | null> => {
+            const visits = await fetchRawVisits(ctx, input.visit);
+            const raw = visits?.[0];
+            if (!raw) return null;
+            const doctor = await fetchVisitDoctor(ctx, raw.diagnosis_by?.[0]);
+            return toVisitDetail(raw, doctor);
+        }),
 });
+
+type RawVisit = {
+    external_uuid: string;
+    id: string;
+    display_name: string;
+    department: string;
+    manual_close_visit: boolean;
+    visit_type: string;
+    diagnosis_by: number[];
+    diagnoses?: unknown;
+};
+
+/** All of the patient's visits, or just one when `externalUuid` is given. */
+async function fetchRawVisits(
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
+    externalUuid?: string,
+): Promise<RawVisit[]> {
+    const domain: any[] = [["partner_id.uuid", "=", ctx.auth.uuid]];
+    if (externalUuid) domain.push(["external_uuid", "=", externalUuid]);
+
+    return ctx.clients.OdooAPI.rpc<RawVisit[]>({
+        model: "patient.visit",
+        method: "search_read",
+        args: [domain],
+        kwargs: {
+            fields: [
+                "external_uuid",
+                "id",
+                "display_name",
+                "diagnosis_by",
+                "diagnoses",
+                "department",
+                "payment_type",
+                "payment_method",
+                "manual_close_visit",
+                "visit_type",
+            ],
+            order: "create_date desc",
+            ...(externalUuid ? { limit: 1 } : {}),
+        },
+    });
+}
+
+/** Resolve the diagnosing practitioner for a visit, if any. */
+async function fetchVisitDoctor(
+    ctx: { clients: ReturnType<typeof createClients> },
+    practitionerId?: number,
+) {
+    if (!practitionerId) return undefined;
+    const doctor = await ctx.clients.OdooAPI.rpc<
+        {
+            name: string;
+            id: number;
+            license_number: string;
+            specialized_title: string;
+        }[]
+    >({
+        model: "emr.practitioner",
+        method: "search_read",
+        args: [[["id", "=", practitionerId]]],
+        kwargs: {
+            fields: ["name", "id", "license_number", "specialized_title"],
+            limit: 1,
+        },
+    });
+    return doctor?.[0];
+}
 
 async function findTwofaforPatient({
     nhis_number,

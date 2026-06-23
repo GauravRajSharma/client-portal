@@ -55,7 +55,7 @@ export default function Prescriptions() {
 					router.back();
 				}}
 			>
-				<ArrowLeft /> Go to visits
+				<ArrowLeft /> Back to visit
 			</Button>
 
 			{isLoading && <Spinner size="large" />}
