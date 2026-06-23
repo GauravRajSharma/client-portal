@@ -1,115 +1,163 @@
-import React from "react";
-
-import { AuthLayout } from "@/components/auth/layout";
-import { AnimatePresence, Button, H1, Spinner, Theme, View } from "tamagui";
+import React, { useState } from "react";
 import { Redirect, router, useGlobalSearchParams } from "expo-router";
-import { Text } from "tamagui";
 import { Controller, useForm } from "react-hook-form";
-import { Input } from "@/components/auth/input";
-import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Eye,
+  EyeOff,
+  Phone,
+} from "@tamagui/lucide-icons";
+import { Button, H1, Paragraph, Text, XStack, YStack } from "tamagui";
+
+import { trpc } from "@/utils/trpc";
+import {
+  AuthError,
+  AuthField,
+  AuthSubmit,
+  friendlyAuthError,
+} from "@/components/auth/input";
+import { AuthLayout, FormStack } from "@/components/auth/layout";
 
 export default function VerificationPage() {
-  const { token, field, value } = useGlobalSearchParams<{
+  const params = useGlobalSearchParams<{
     token: string;
     field: string;
     value: string;
   }>();
+  const token = params.token;
+  const field = params.field;
+  const value = params.value;
+
+  const isPhone = value === "mobile";
+  // Recognition, not a secret: the patient is confirming their OWN number, so show it
+  // by default for phone (and avoid the password keyboard that breaks phone-pad on
+  // Android). Insurance numbers start hidden but can be revealed.
+  const [reveal, setReveal] = useState(isPhone);
 
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm({
-    defaultValues: {
-      [value ?? "-"]: "",
-    },
+  } = useForm<Record<string, string>>({
+    defaultValues: { [value ?? "-"]: "" },
   });
 
   const { mutateAsync: verify, isPending, error } = trpc.verify.useMutation();
 
   if (!token || !field || !value) return <Redirect href="/" />;
 
+  const fieldName = value;
+  const fieldLower = field.toLowerCase();
+
   const handleVerify = async (data: Record<string, string>) => {
     try {
-      const response = await verify({ token, value: data?.[value] });
+      const response = await verify({ token, value: data?.[fieldName] });
       if (response) {
         await AsyncStorage.setItem("access:token", response.accessToken);
         router.replace(`/patient/${response.uuid}/visits`);
       }
-    } catch (error) {}
+    } catch {
+      // surfaced via `error` below
+    }
   };
 
   return (
     <AuthLayout>
-      <View flexDirection="column" minW="100%" maxW="100%" gap="$4">
-        <H1
-          size="$8"
-          $xs={{
-            size: "$7",
-          }}
+      <YStack gap="$2">
+        <Button
+          self="flex-start"
+          size="$2"
+          chromeless
+          px="$1"
+          color="$color10"
+          icon={<ArrowLeft size={16} color="$color10" />}
+          onPress={() => router.back()}
+          accessibilityLabel="Go back to sign in"
         >
-          Verify to view your personal health records
+          <Button.Text fontSize="$3" color="$color10">
+            Back
+          </Button.Text>
+        </Button>
+
+        <H1 size="$8" $md={{ size: "$9" }} fontWeight="800" color="$color12">
+          Confirm it is you
         </H1>
+        <Paragraph fontSize="$4" color="$color10" lineHeight="$5">
+          For your privacy, enter your {fieldLower} to open your health record.
+        </Paragraph>
+      </YStack>
 
-        <View>
-          <Controller
-            control={control}
-            rules={{
-              required: true,
-            }}
-            render={({ field: { onChange, value } }) => (
-              <Input size="$4">
-                <Input.Label> {field}</Input.Label>
-                <Input.Box>
-                  <Input.Area
-                    onChange={(e) => onChange(e.nativeEvent.text)}
-                    value={value}
-                    placeholder=""
-                  />
-                </Input.Box>
-              </Input>
-            )}
-            name={value ?? ""}
-          />
-        </View>
+      <FormStack>
+        <Controller
+          control={control}
+          rules={{ required: `Enter your ${fieldLower}.` }}
+          name={fieldName}
+          render={({ field: { onChange, onBlur, value: v } }) => (
+            <AuthField
+              label={field}
+              nativeID="verify-field"
+              Icon={isPhone ? Phone : BadgeCheck}
+              value={v}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              placeholder={isPhone ? "98XXXXXXXX" : "Your insurance number"}
+              helper={
+                isPhone
+                  ? "The mobile number registered at your hospital."
+                  : "The insurance number registered at your hospital."
+              }
+              error={errors[fieldName]?.message as string | undefined}
+              secureTextEntry={!reveal}
+              keyboardType={isPhone ? "phone-pad" : "default"}
+              inputMode={isPhone ? "tel" : "text"}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="go"
+              onSubmitEditing={handleSubmit(handleVerify)}
+              trailing={
+                <Button
+                  width={44}
+                  height={44}
+                  circular
+                  chromeless
+                  hitSlop={8}
+                  icon={
+                    reveal ? (
+                      <EyeOff size={20} color="$color10" />
+                    ) : (
+                      <Eye size={20} color="$color10" />
+                    )
+                  }
+                  onPress={() => setReveal((r) => !r)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    reveal ? `Hide ${fieldLower}` : `Show ${fieldLower}`
+                  }
+                />
+              }
+            />
+          )}
+        />
 
-        <Theme inverse>
-          <Button
-            disabled={isPending}
-            onPress={handleSubmit(handleVerify)}
-            width="100%"
-            iconAfter={
-              <AnimatePresence>
-                {isPending && (
-                  <Spinner
-                    color="$color"
-                    key="loading-spinner"
-                    opacity={1}
-                    scale={1}
-                    animation="quick"
-                    position="absolute"
-                    enterStyle={{
-                      opacity: 0,
-                      scale: 0.5,
-                    }}
-                    exitStyle={{
-                      opacity: 0,
-                      scale: 0.5,
-                    }}
-                  />
-                )}
-              </AnimatePresence>
-            }
-          >
-            <Button.Text>Verify and Proceed</Button.Text>
-          </Button>
-        </Theme>
+        <AuthError message={friendlyAuthError(error, "verify")} />
 
-        <View>
-          <Text color="$red10">{error?.message}</Text>
-        </View>
-      </View>
+        <AuthSubmit
+          label="Verify and continue"
+          pendingLabel="Verifying"
+          pending={isPending}
+          Icon={BadgeCheck}
+          onPress={handleSubmit(handleVerify)}
+        />
+      </FormStack>
+
+      <XStack items="center" gap="$2" px="$1">
+        <Text fontSize="$2" color="$color10" flex={1}>
+          This step keeps your record private to you.
+        </Text>
+      </XStack>
     </AuthLayout>
   );
 }

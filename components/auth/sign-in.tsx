@@ -1,55 +1,83 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Adapt,
-  AnimatePresence,
-  Button,
-  FontSizeTokens,
-  getFontSize,
-  H1,
+  type FontSizeTokens,
+  type SelectProps,
   Select,
-  SelectProps,
   Sheet,
-  Spinner,
   Text,
-  Theme,
-  View,
+  XStack,
   YStack,
+  getFontSize,
 } from "tamagui";
-import { Input } from "./input";
-import { useForm, Controller } from "react-hook-form";
-import { trpc } from "@/utils/trpc";
-import { Check, ChevronDown, ChevronUp } from "@tamagui/lucide-icons";
-import { StyleSheet } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { X } from "@tamagui/lucide-icons";
-import { throttle } from "lodash";
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Hospital,
+} from "@tamagui/lucide-icons";
 
-/** simulate signin */
-function useSignIn() {
-  const [status, setStatus] = useState<"idle" | "loading" | "success">("idle");
-  return {
-    status: status,
-    signIn: () => {
-      setStatus("loading");
-      setTimeout(() => {
-        setStatus("success");
-      }, 2000);
-    },
-  };
-}
-
-export function SelectDemoItem<T extends { name: string }>(
-  props: SelectProps & { items: T[] },
+/**
+ * HospitalSelect — Clinical Slate hospital picker.
+ *
+ * Web: a native-feeling dropdown. Touch: a bottom sheet (large rows, easy to tap on
+ * low-end Android). The trigger reads as a real form control: leading hospital icon,
+ * the selected name (or a clear placeholder), trailing chevron, full-height tap target.
+ *
+ * Visual + a11y only. No data writes; selection just sets the form's server value.
+ */
+export function HospitalSelect<T extends { name: string }>(
+  props: SelectProps & { items: T[]; placeholder?: string; invalid?: boolean },
 ) {
+  const { items, placeholder = "Select your hospital", invalid, ...rest } = props;
+
   return (
-    <Select {...props}>
-      <Select.Trigger iconAfter={ChevronDown}>
-        <Select.Value placeholder="Select a hospital" />
+    <Select disablePreventBodyScroll {...rest}>
+      <Select.Trigger
+        height={52}
+        bg="$color2"
+        borderWidth={1}
+        borderColor={invalid ? "$red8" : "$borderColor"}
+        rounded="$5"
+        px="$3.5"
+        focusStyle={{
+          borderColor: "$accent8",
+          outlineColor: "$accent8",
+          outlineWidth: 2,
+          outlineStyle: "solid",
+        }}
+        hoverStyle={{ borderColor: "$borderColorHover" }}
+        iconAfter={<ChevronDown size={18} color="$color10" />}
+      >
+        <XStack items="center" gap="$2.5" flex={1}>
+          <Building2 size={18} color="$color10" />
+          <Select.Value
+            placeholder={placeholder}
+            fontSize="$5"
+            color="$color12"
+          />
+        </XStack>
       </Select.Trigger>
 
       <Adapt platform="touch">
-        <Sheet native={true} modal dismissOnSnapToBottom animation="quickest">
-          <Sheet.Frame>
+        <Sheet
+          native
+          modal
+          dismissOnSnapToBottom
+          snapPointsMode="fit"
+          animation="quick"
+        >
+          <Sheet.Frame bg="$color1" pt="$2" pb="$6">
+            <Sheet.Handle bg="$color5" />
+            <YStack px="$4" py="$3">
+              <Text fontSize="$6" fontWeight="800" color="$color12">
+                Choose your hospital
+              </Text>
+              <Text fontSize="$2" color="$color10">
+                Where your records are kept
+              </Text>
+            </YStack>
             <Sheet.ScrollView>
               <Adapt.Contents />
             </Sheet.ScrollView>
@@ -65,243 +93,82 @@ export function SelectDemoItem<T extends { name: string }>(
 
       <Select.Content zIndex={200000}>
         <Select.ScrollUpButton
+          items="center"
           justify="center"
           position="relative"
           width="100%"
           height="$3"
+          bg="$color1"
         >
-          <YStack z={10}>
-            <ChevronUp size={20} />
-          </YStack>
+          <ChevronUp size={18} color="$color10" />
         </Select.ScrollUpButton>
 
-        <Select.Viewport minW={200}>
+        <Select.Viewport minW={260} bg="$color1" rounded="$5">
+          {items.length === 0 ? (
+            <YStack px="$3.5" py="$4">
+              <Text fontSize="$3" color="$color10">
+                No hospitals available right now.
+              </Text>
+            </YStack>
+          ) : null}
           <Select.Group>
             {React.useMemo(
               () =>
-                props.items.map((item, i) => {
-                  return (
-                    <Select.Item index={i} key={item.name} value={item.name}>
-                      <Select.ItemText fontSize="$5">
-                        {i + 1}. {item.name}
-                      </Select.ItemText>
-                      <Select.ItemIndicator marginLeft="auto">
-                        <Check size={16} />
-                      </Select.ItemIndicator>
-                    </Select.Item>
-                  );
-                }),
-              [props.items],
+                items.map((item, i) => (
+                  <Select.Item
+                    index={i}
+                    key={item.name}
+                    value={item.name}
+                    height={52}
+                    px="$3.5"
+                    gap="$3"
+                    hoverStyle={{ bg: "$color3" }}
+                    focusStyle={{ bg: "$color3" }}
+                  >
+                    <Hospital size={18} color="$color9" />
+                    <Select.ItemText fontSize="$5" color="$color12" flex={1}>
+                      {item.name}
+                    </Select.ItemText>
+                    <Select.ItemIndicator marginLeft="auto">
+                      <Check size={18} color="$accent9" />
+                    </Select.ItemIndicator>
+                  </Select.Item>
+                )),
+              [items],
             )}
           </Select.Group>
-          {/* Native gets an extra icon */}
-          {props.native && (
+
+          {props.native ? (
             <YStack
               position="absolute"
               r={0}
               t={0}
               b={0}
               justify="center"
-              width={"$4"}
+              width="$4"
               pointerEvents="none"
             >
               <ChevronDown
                 size={getFontSize((props.size as FontSizeTokens) ?? "$true")}
               />
             </YStack>
-          )}
+          ) : null}
         </Select.Viewport>
 
         <Select.ScrollDownButton
+          items="center"
           justify="center"
           position="relative"
           width="100%"
           height="$3"
+          bg="$color1"
         >
-          <YStack z={10}>
-            <ChevronDown size={20} />
-          </YStack>
+          <ChevronDown size={18} color="$color10" />
         </Select.ScrollDownButton>
       </Select.Content>
     </Select>
   );
 }
 
-export function SignInScreen() {
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<Record<string, string>>({
-    defaultValues: {
-      mrn: "",
-      server: "",
-    },
-  });
-  const { data, isLoading } = trpc.hospitals.useQuery();
-  const {
-    mutate,
-    isPending,
-    data: user,
-    error,
-    isSuccess,
-  } = trpc.signIn.useMutation();
-
-  if (isLoading)
-    return (
-      <View>
-        <Text>Loading...</Text>
-      </View>
-    );
-
-  const onSubmit = (data: any) => mutate(data);
-
-  const shouldCheckVerification = isSuccess && user?.verification;
-
-  return (
-    <View flexDirection="column" minW="100%" maxW="100%" gap="$4">
-      <H1
-        size="$8"
-        $xs={{
-          size: "$7",
-        }}
-      >
-        {shouldCheckVerification
-          ? "Verify to view your personal health records"
-          : "Sign in to view your personal health records"}
-      </H1>
-      <View flexDirection="column" gap="$3">
-        {shouldCheckVerification ? (
-          <View>
-            <Controller
-              control={control}
-              rules={{
-                required: true,
-              }}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input size="$4">
-                  <Input.Label> {user?.verification?.field.label}</Input.Label>
-                  <Input.Box>
-                    <Input.Area placeholder="" />
-                  </Input.Box>
-                </Input>
-              )}
-              name={user?.verification?.field.value ?? ""}
-            />
-          </View>
-        ) : (
-          <React.Fragment></React.Fragment>
-        )}
-      </View>
-      <Theme inverse>
-        <Button
-          disabled={isPending}
-          onPress={handleSubmit(onSubmit)}
-          width="100%"
-          iconAfter={
-            <AnimatePresence>
-              {isPending && (
-                <Spinner
-                  color="$color"
-                  key="loading-spinner"
-                  opacity={1}
-                  scale={1}
-                  animation="quick"
-                  position="absolute"
-                  enterStyle={{
-                    opacity: 0,
-                    scale: 0.5,
-                  }}
-                  exitStyle={{
-                    opacity: 0,
-                    scale: 0.5,
-                  }}
-                />
-              )}
-            </AnimatePresence>
-          }
-        >
-          <Button.Text>
-            {shouldCheckVerification ? "Sign In" : "Proceed"}
-          </Button.Text>
-        </Button>
-      </Theme>
-
-      {!shouldCheckVerification && (
-        <ScanVisitTicket
-          onScan={(data: string) => mutate({ mrn: data, server: "" })}
-        />
-      )}
-
-      {user && (
-        <View>
-          <Text>Welcome, {user.ref}</Text>
-        </View>
-      )}
-
-      {error && (
-        <View>
-          <Text>{error.message}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function ScanVisitTicket({ onScan }: { onScan: (data: string) => void }) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [showCamera, setShowCamera] = useState(false);
-
-  if (!permission) {
-    return <View />;
-  }
-
-  const handleScan = throttle(
-    ({ data }: { data: string }) => {
-      onScan(data);
-    },
-    1000,
-    { leading: true, trailing: false },
-  );
-
-  return (
-    <>
-      <YStack justify="center">
-        <View flexDirection="row" justify="center" width="100%" gap="$4">
-          <View flex={1} height={1} bg="$borderColor" />
-          <Text py="$4" color="gainsboro" mt="$-5">
-            OR
-          </Text>
-          <View flex={1} height={1} bg="$borderColor" />
-        </View>
-
-        <Button
-          icon={showCamera ? X : undefined}
-          onPress={() => {
-            if (permission.granted) setShowCamera(!showCamera);
-            else requestPermission();
-          }}
-        >
-          <Button.Text>
-            {showCamera ? "Close Scanner" : "Scan Your Ticket"}
-          </Button.Text>
-        </Button>
-      </YStack>
-
-      {showCamera && (
-        <View position="absolute" t={0} l={0} r={0} b={0} z={1000}>
-          <CameraView
-            style={StyleSheet.absoluteFillObject}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr"],
-            }}
-            onBarcodeScanned={({ data }) => {
-              setShowCamera(false);
-              handleScan({ data });
-            }}
-          />
-        </View>
-      )}
-    </>
-  );
-}
+/** Backwards-compatible alias for the old call site name. */
+export const SelectDemoItem = HospitalSelect;
