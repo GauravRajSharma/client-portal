@@ -139,11 +139,19 @@ export function computeLabStatus(
 
 export function toLabResult(raw: any, meta: any, panel?: string): LabResult {
   const numeric = num(raw?.value);
+  // OpenMRS returns 0 (not null) for unset critical bounds. A literal 0 critical is
+  // the "unset" sentinel, not a real threshold — treat it as absent, otherwise every
+  // positive value reads as "critically high" and we alarm patients over normal labs.
+  // ponytail: if a lab ever needs a genuine 0 critical bound, switch to an API presence flag.
+  const nzCrit = (v: unknown): number | undefined => {
+    const n = num(v);
+    return n === 0 ? undefined : n;
+  };
   const m = {
     lowNormal: num(meta?.lowNormal),
     hiNormal: num(meta?.hiNormal),
-    lowCritical: num(meta?.lowCritical),
-    hiCritical: num(meta?.hiCritical),
+    lowCritical: nzCrit(meta?.lowCritical),
+    hiCritical: nzCrit(meta?.hiCritical),
   };
   return {
     id: String(raw?.id ?? ""),

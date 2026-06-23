@@ -75,6 +75,7 @@ const hospitals = [
     { prefix: "MBDH", server: "mbdh-cloud" },
     { prefix: "ABHU", server: "abhu" },
     { prefix: "RUPA", server: "rupa" },
+    { prefix: "DGPH", server: "dlph" },
 ];
 
 import { JWT_SECRET } from "../config/env";
@@ -741,7 +742,6 @@ async function fetchRawVisits(
                 "id",
                 "display_name",
                 "diagnosis_by",
-                "diagnoses",
                 "department",
                 "payment_type",
                 "payment_method",
