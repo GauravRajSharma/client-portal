@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { toLabResult } from "../adapters";
+import type { LabResult } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -352,52 +354,26 @@ export const appRouter = router({
             return cleanedHtml;
         }),
 
+    /**
+     * Lab results for a single visit, returned as DTOs (LabResult[]).
+     * The UI never sees raw Odoo/OpenMRS shapes - adapters own that mapping.
+     */
     patientLabResults: protectedProcedure
         .input(z.object({ visit: z.string() }))
-        .query(async ({ ctx, input }) => {
-            const results = await ctx.clients.OdooAPI.rpc<
-                {
-                    id: number;
-                    lab_item: [number, string] | false;
-                    value: string;
-                    raw: {
-                        order: { uuid: string };
-                        value: string;
-                        status: string;
-                        concept: { uuid: string };
-                    };
-                }[]
-            >({
-                model: "emr.lab_observations",
-                method: "search_read",
-                args: [
-                    [
-                        ["patient.uuid", "=", ctx.auth.uuid],
-                        ["patient_visit.external_uuid", "=", input.visit],
-                    ],
-                ],
-                kwargs: {
-                    fields: ["lab_item", "id", "value", "raw"],
-                    order: "create_date asc",
-                },
-            });
-            let final = results.filter((r) => r.lab_item);
-
-            return Promise.all(
-                final.map(async (result) => {
-                    const meta = await ctx.clients.OpenmrsAPI<{
-                        hiAbsolute: number;
-                        hiCritical: number;
-                        hiNormal: number;
-                        lowAbsolute: number;
-                        lowCritical: number;
-                        lowNormal: number;
-                        units: string;
-                    }>(`concept/${result.raw.concept.uuid}?v=full`);
-                    return { ...result, meta };
-                }),
-            );
+        .query(async ({ ctx, input }): Promise<LabResult[]> => {
+            return fetchLabResults(ctx, { visit: input.visit });
         }),
+
+    /**
+     * Global lab results across ALL of the patient's visits, as DTOs (LabResult[]).
+     * Same emr.lab_observations source as patientLabResults, without the visit filter.
+     * Identity is taken from the verified token (ctx.auth.uuid) only. Read-only.
+     */
+    patientAllLabResults: protectedProcedure.query(
+        async ({ ctx }): Promise<LabResult[]> => {
+            return fetchLabResults(ctx, {});
+        },
+    ),
 
     patientVisits: protectedProcedure.query(async ({ ctx }) => {
         const visits = await ctx.clients.OdooAPI.rpc<
@@ -458,6 +434,85 @@ export const appRouter = router({
         );
     }),
 });
+
+type LabCtx = {
+    auth: TAuthData;
+    clients: ReturnType<typeof createClients>;
+};
+
+type RawLabObservation = {
+    id: number;
+    lab_item: [number, string] | false;
+    value: string;
+    create_date?: string;
+    raw: {
+        order: { uuid: string };
+        value: string;
+        status: string;
+        concept: { uuid: string };
+    };
+};
+
+type ConceptMeta = {
+    hiAbsolute: number;
+    hiCritical: number;
+    hiNormal: number;
+    lowAbsolute: number;
+    lowCritical: number;
+    lowNormal: number;
+    units: string;
+};
+
+/**
+ * Shared lab-observation fetch + DTO mapping for both the per-visit and the global
+ * (all-visits) lab queries. Pulls observations from Odoo (emr.lab_observations),
+ * enriches each with its OpenMRS concept reference range, and returns LabResult[].
+ *
+ * Concept metadata is fetched once per distinct concept (deduped) so the global query
+ * across many visits does not refetch the same reference ranges repeatedly.
+ */
+async function fetchLabResults(
+    ctx: LabCtx,
+    opts: { visit?: string },
+): Promise<LabResult[]> {
+    const domain: any[] = [["patient.uuid", "=", ctx.auth.uuid]];
+    if (opts.visit) {
+        domain.push(["patient_visit.external_uuid", "=", opts.visit]);
+    }
+
+    const observations = await ctx.clients.OdooAPI.rpc<RawLabObservation[]>({
+        model: "emr.lab_observations",
+        method: "search_read",
+        args: [domain],
+        kwargs: {
+            fields: ["lab_item", "id", "value", "raw", "create_date"],
+            order: "create_date asc",
+        },
+    });
+
+    const final = observations.filter((r) => r.lab_item);
+
+    // Dedupe concept lookups: one OpenMRS call per distinct concept uuid.
+    const conceptCache = new Map<string, Promise<ConceptMeta | undefined>>();
+    const loadConcept = (uuid?: string) => {
+        if (!uuid) return Promise.resolve(undefined);
+        let cached = conceptCache.get(uuid);
+        if (!cached) {
+            cached = ctx.clients
+                .OpenmrsAPI<ConceptMeta>(`concept/${uuid}?v=full`)
+                .catch(() => undefined);
+            conceptCache.set(uuid, cached);
+        }
+        return cached;
+    };
+
+    return Promise.all(
+        final.map(async (obs) => {
+            const meta = await loadConcept(obs.raw?.concept?.uuid);
+            return toLabResult(obs, meta);
+        }),
+    );
+}
 
 async function findTwofaforPatient({
     nhis_number,

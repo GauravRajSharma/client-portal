@@ -37,6 +37,6 @@ export function labStatusMeta(status: LabStatus): StatusMeta {
     case "critical-high":
       return { label: "Very high", theme: "error", Icon: ChevronsUp, attention: true };
     default:
-      return { label: "—", theme: "neutral", Icon: Minus, attention: false };
+      return { label: "Not classified", theme: "neutral", Icon: Minus, attention: false };
   }
 }
