@@ -4,9 +4,14 @@ import { Controller, useForm } from "react-hook-form";
 import {
   CheckCircle,
   CreditCard,
+  Fingerprint,
+  KeyRound,
+  Lock,
+  Mail,
+  ScanFace,
   ShieldCheck,
 } from "@tamagui/lucide-icons";
-import { Button, H1, Paragraph, Text, Theme, XStack, YStack } from "tamagui";
+import { Button, Text, Theme, XStack, YStack } from "tamagui";
 
 import { trpc } from "@/utils/trpc";
 import {
@@ -23,6 +28,105 @@ import { Skeleton } from "@/components/ui";
 
 type SignInForm = { mrn: string; server: string };
 
+/** A read-only, disabled field rendered for the not-yet-available app-account flow. */
+function GhostField({ Icon, placeholder }: { Icon: any; placeholder: string }) {
+  return (
+    <XStack
+      height={50}
+      rounded={14}
+      borderWidth={1}
+      borderColor="$border"
+      bg="$surface2"
+      items="center"
+      px="$3.5"
+      gap="$2.5"
+      opacity={0.7}
+    >
+      <Icon size={18} color="$text3" />
+      <Text fontSize={15} color="$text3">
+        {placeholder}
+      </Text>
+    </XStack>
+  );
+}
+
+/**
+ * The future "app account" sign-in (email + password + biometrics). Present, on-brand,
+ * and clearly marked Coming soon. The working sign-in is the hospital record below.
+ */
+function AppAccountComingSoon() {
+  return (
+    <YStack
+      gap="$2.5"
+      p="$3.5"
+      rounded={16}
+      borderWidth={1}
+      borderColor="$border"
+      bg="$surface"
+    >
+      <XStack items="center" justify="space-between">
+        <Text fontSize={13} fontWeight="700" color="$color12">
+          Sign in with your app account
+        </Text>
+        <XStack
+          items="center"
+          gap="$1.5"
+          bg="$primarySoft"
+          px="$2"
+          py="$1"
+          rounded={20}
+        >
+          <Lock size={11} color="$primary" />
+          <Text fontSize={10} fontWeight="700" color="$primary">
+            COMING SOON
+          </Text>
+        </XStack>
+      </XStack>
+      <GhostField Icon={Mail} placeholder="you@example.com" />
+      <GhostField Icon={Lock} placeholder="Password" />
+      <XStack gap="$2.5" mt="$1">
+        {[
+          { Icon: ScanFace, label: "Face ID" },
+          { Icon: Fingerprint, label: "Touch ID" },
+          { Icon: KeyRound, label: "Passkey" },
+        ].map((b) => (
+          <YStack
+            key={b.label}
+            flex={1}
+            height={58}
+            rounded={14}
+            borderWidth={1}
+            borderColor="$border"
+            bg="$surface2"
+            items="center"
+            justify="center"
+            gap="$1.5"
+            opacity={0.6}
+          >
+            <b.Icon size={20} color="$text3" />
+            <Text fontSize={10.5} color="$text3" fontWeight="500">
+              {b.label}
+            </Text>
+          </YStack>
+        ))}
+      </XStack>
+    </YStack>
+  );
+}
+
+/** "or sign in from your hospital" divider. */
+function OrDivider() {
+  return (
+    <XStack items="center" gap="$3" my="$1">
+      <YStack flex={1} height={1} bg="$border" />
+      <Text fontSize={12} color="$text3" fontWeight="600">
+        or sign in from your hospital
+      </Text>
+      <YStack flex={1} height={1} bg="$border" />
+    </XStack>
+  );
+}
+
 export default function SignIn() {
   const {
     control,
@@ -32,9 +136,7 @@ export default function SignIn() {
     clearErrors,
     watch,
     formState: { errors },
-  } = useForm<SignInForm>({
-    defaultValues: { mrn: "", server: "" },
-  });
+  } = useForm<SignInForm>({ defaultValues: { mrn: "", server: "" } });
 
   const {
     data: hospitals,
@@ -51,7 +153,6 @@ export default function SignIn() {
   const selectedHospital = hospitals?.find(
     (h) => h.hospital.server === selectedServer,
   );
-
   const hospitalsReady = Boolean(hospitals && hospitals.length > 0);
 
   const handleSignIn = async (data: SignInForm) => {
@@ -70,9 +171,6 @@ export default function SignIn() {
     }
   };
 
-  // Scanning is the path for patients who cannot type an MRN. Route it through the
-  // same validation as the button: never auto-submit a form that would fail its own
-  // required rules (e.g. no hospital chosen).
   const handleScan = (data: string) => {
     const mrn = data.trim();
     setValue("mrn", mrn, { shouldValidate: true });
@@ -89,50 +187,55 @@ export default function SignIn() {
 
   return (
     <AuthLayout>
-      <YStack gap="$2">
-        <H1 size="$8" $md={{ size: "$9" }} fontWeight="800" color="$color12">
-          Sign in
-        </H1>
-        <Paragraph fontSize="$4" color="$color10" lineHeight="$5">
-          View your visits, lab results, medicines, and bills from your
-          hospital.
-        </Paragraph>
+      <YStack gap="$1" items="center" mb="$1">
+        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
+          Welcome back
+        </Text>
+        <Text fontSize={14} color="$text2" text="center">
+          Sign in to view your health records.
+        </Text>
       </YStack>
 
+      <AppAccountComingSoon />
+
+      <OrDivider />
+
       {selectedHospital ? (
-        <Theme name="accent">
-          <XStack
-            items="center"
-            gap="$2.5"
-            px="$3"
-            py="$2.5"
-            rounded="$5"
-            bg="$color3"
-          >
-            <ShieldCheck size={16} color="$color9" />
-            <Text fontSize="$3" color="$color11" flex={1} numberOfLines={1}>
-              Signing in to{" "}
-              <Text fontWeight="800" color="$color11">
-                {selectedHospital.name}
-              </Text>
+        <XStack
+          items="center"
+          gap="$2.5"
+          px="$3"
+          py="$2.5"
+          rounded={12}
+          bg="$primarySoft"
+        >
+          <ShieldCheck size={16} color="$primary" />
+          <Text fontSize={13} color="$color12" flex={1} numberOfLines={1}>
+            Signing in to{" "}
+            <Text fontWeight="700" color="$color12">
+              {selectedHospital.name}
             </Text>
-          </XStack>
-        </Theme>
+          </Text>
+        </XStack>
       ) : null}
 
       <FormStack>
-        {isHospitalsError ? (
+        {isHospitalsError || (!isHospitalsLoading && !hospitalsReady) ? (
           <AuthSelectField
             label="Hospital"
             htmlFor="hospital"
-            error="We could not load the hospital list. Please try again."
+            error={
+              isHospitalsError
+                ? "We could not load the hospital list. Please try again."
+                : "No hospitals are available right now. Please try again shortly."
+            }
           >
             <Button
               height={52}
-              rounded="$5"
-              bg="$color1"
+              rounded={14}
+              bg="$surface"
               borderWidth={1}
-              borderColor="$borderColor"
+              borderColor="$borderStrong"
               disabled={isHospitalsRefetching}
               onPress={() => refetchHospitals()}
             >
@@ -144,28 +247,8 @@ export default function SignIn() {
         ) : isHospitalsLoading ? (
           <YStack gap="$2">
             <Skeleton height={16} width="30%" rounded="$3" />
-            <Skeleton height={52} rounded="$5" width="100%" />
+            <Skeleton height={52} rounded={14} width="100%" />
           </YStack>
-        ) : !hospitalsReady ? (
-          <AuthSelectField
-            label="Hospital"
-            htmlFor="hospital"
-            error="No hospitals are available right now. Please try again shortly."
-          >
-            <Button
-              height={52}
-              rounded="$5"
-              bg="$color1"
-              borderWidth={1}
-              borderColor="$borderColor"
-              disabled={isHospitalsRefetching}
-              onPress={() => refetchHospitals()}
-            >
-              <Button.Text fontSize="$4" fontWeight="700" color="$color12">
-                {isHospitalsRefetching ? "Trying again" : "Try again"}
-              </Button.Text>
-            </Button>
-          </AuthSelectField>
         ) : (
           <Controller
             control={control}
@@ -182,13 +265,10 @@ export default function SignIn() {
                   id="hospital"
                   items={hospitals ?? []}
                   invalid={Boolean(errors.server)}
-                  value={
-                    hospitals?.find((h) => h.hospital.server === value)?.name
-                  }
+                  value={hospitals?.find((h) => h.hospital.server === value)?.name}
                   onValueChange={(name) =>
                     onChange(
-                      hospitals?.find((h) => h.name === name)?.hospital
-                        .server ?? "",
+                      hospitals?.find((h) => h.name === name)?.hospital.server ?? "",
                     )
                   }
                 />
@@ -213,7 +293,7 @@ export default function SignIn() {
               onChangeText={(t) => onChange(t.trim())}
               onBlur={onBlur}
               placeholder="ABCD123456"
-              helper="Printed on your hospital card or visit ticket."
+              helper="Printed on your hospital card or visit ticket sticker."
               error={errors.mrn?.message}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -225,20 +305,18 @@ export default function SignIn() {
         />
 
         {mrnValue && !errors.mrn ? (
-          <Theme name="success">
-            <XStack items="center" gap="$2" px="$1">
-              <CheckCircle size={15} color="$color10" />
-              <Text fontSize="$2" color="$color11">
-                Record number captured.
-              </Text>
-            </XStack>
-          </Theme>
+          <XStack items="center" gap="$2" px="$1">
+            <CheckCircle size={15} color="$good" />
+            <Text fontSize={12} color="$text2">
+              Record number captured.
+            </Text>
+          </XStack>
         ) : null}
 
         <AuthError message={friendlyAuthError(error, "signin")} />
 
         <AuthSubmit
-          label="Sign in"
+          label="Continue"
           pendingLabel="Checking your record"
           pending={isPending}
           disabled={!hospitalsReady}
