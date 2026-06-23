@@ -1,5 +1,19 @@
 import React from "react";
 
+import { trpc } from "@/utils/trpc";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  Ambulance,
+  Bed,
+  BriefcaseMedical,
+  Divide,
+  FlaskConical,
+  PanelRightClose,
+  Pill,
+  PillBottle,
+  Stethoscope,
+} from "@tamagui/lucide-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import {
   Button,
@@ -16,20 +30,6 @@ import {
   XStack,
   YStack,
 } from "tamagui";
-import { trpc } from "@/utils/trpc";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  Ambulance,
-  Bed,
-  BriefcaseMedical,
-  Divide,
-  FlaskConical,
-  PanelRightClose,
-  Stethoscope,
-  PillBottle,
-  Pill,
-} from "@tamagui/lucide-icons";
 
 type TVisitCardProps = {
   external_uuid: string;
@@ -170,7 +170,7 @@ function PatientCard() {
           <YStack gap="$3">
             <XStack width="100%" justify="space-between" items="center">
               <Text maxW="50%" fontWeight="bold">
-                {data?.name} — {data?.ref}
+                {data?.name} — {data?.mrn}
               </Text>
               <Button
                 onPress={async () => {
@@ -188,7 +188,7 @@ function PatientCard() {
               icon={PillBottle}
               onPress={() =>
                 // @ts-ignore
-                router.push(`/patient/${data?.uuid}/active-medications`)
+                router.push(`/patient/${data?.id}/active-medications`)
               }
             >
               View Active Medications

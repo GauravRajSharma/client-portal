@@ -1,4 +1,4 @@
-import type { NamedExoticComponent, ReactNode } from "react";
+import { type TKey, useT } from "@/utils/i18n";
 import {
   Activity,
   FlaskConical,
@@ -7,23 +7,24 @@ import {
   Stethoscope,
   User,
 } from "@tamagui/lucide-icons";
-import { router, usePathname, useGlobalSearchParams } from "expo-router";
-import { Text, Theme, XStack, YStack, useMedia } from "tamagui";
+import { router, useGlobalSearchParams, usePathname } from "expo-router";
+import type { NamedExoticComponent, ReactNode } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Text, Theme, XStack, YStack, useMedia } from "tamagui";
 
 interface NavItem {
   key: string; // route suffix under /patient/[uuid]/
-  label: string;
+  labelKey: TKey; // localized label (see utils/i18n)
   Icon: NamedExoticComponent<any>;
 }
 
 // Primary IA. Billing/documents are reached from Home and Profile to keep the bar to 5.
 const NAV: NavItem[] = [
-  { key: "home", label: "Home", Icon: LayoutGrid },
-  { key: "visits", label: "Visits", Icon: Stethoscope },
-  { key: "results", label: "Results", Icon: FlaskConical },
-  { key: "meds", label: "Medicines", Icon: Pill },
-  { key: "profile", label: "Profile", Icon: User },
+  { key: "home", labelKey: "nav.home", Icon: LayoutGrid },
+  { key: "visits", labelKey: "nav.visits", Icon: Stethoscope },
+  { key: "results", labelKey: "nav.results", Icon: FlaskConical },
+  { key: "meds", labelKey: "nav.meds", Icon: Pill },
+  { key: "profile", labelKey: "nav.profile", Icon: User },
 ];
 
 function useActiveKey() {
@@ -39,10 +40,12 @@ function go(uuid: string, key: string) {
 /** Sidebar nav item (web). */
 function SideItem({
   item,
+  label,
   active,
   onPress,
 }: {
   item: NavItem;
+  label: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -61,8 +64,12 @@ function SideItem({
       cursor="pointer"
     >
       <item.Icon size={20} color={active ? "$accent9" : "$color10"} />
-      <Text fontSize="$4" fontWeight={active ? "700" : "500"} color={active ? "$color12" : "$color11"}>
-        {item.label}
+      <Text
+        fontSize="$4"
+        fontWeight={active ? "700" : "500"}
+        color={active ? "$color12" : "$color11"}
+      >
+        {label}
       </Text>
     </XStack>
   );
@@ -71,10 +78,12 @@ function SideItem({
 /** Bottom tab (mobile). */
 function Tab({
   item,
+  label,
   active,
   onPress,
 }: {
   item: NavItem;
+  label: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -89,8 +98,13 @@ function Tab({
       pressStyle={{ opacity: 0.6 }}
     >
       <item.Icon size={22} color={active ? "$accent9" : "$color9"} />
-      <Text fontSize={11} fontWeight={active ? "700" : "500"} color={active ? "$accent9" : "$color9"}>
-        {item.label}
+      <Text
+        fontSize={11}
+        fontWeight={active ? "700" : "500"}
+        color={active ? "$accent9" : "$color9"}
+        numberOfLines={1}
+      >
+        {label}
       </Text>
     </YStack>
   );
@@ -104,6 +118,7 @@ export function NavShell({ children }: { children: ReactNode }) {
   const media = useMedia();
   const insets = useSafeAreaInsets();
   const active = useActiveKey();
+  const T = useT();
   const { uuid } = useGlobalSearchParams<{ uuid: string }>();
   const patientUuid = uuid ?? "";
 
@@ -121,7 +136,14 @@ export function NavShell({ children }: { children: ReactNode }) {
         >
           <XStack items="center" gap="$2.5" px="$3" pb="$4">
             <Theme name="accent">
-              <YStack width={30} height={30} rounded="$4" bg="$accent9" items="center" justify="center">
+              <YStack
+                width={30}
+                height={30}
+                rounded="$4"
+                bg="$accent9"
+                items="center"
+                justify="center"
+              >
                 <Activity size={18} color="#fff" />
               </YStack>
             </Theme>
@@ -133,6 +155,7 @@ export function NavShell({ children }: { children: ReactNode }) {
             <SideItem
               key={item.key}
               item={item}
+              label={T(item.labelKey)}
               active={item.key === active}
               onPress={() => go(patientUuid, item.key)}
             />
@@ -157,6 +180,7 @@ export function NavShell({ children }: { children: ReactNode }) {
           <Tab
             key={item.key}
             item={item}
+            label={T(item.labelKey)}
             active={item.key === active}
             onPress={() => go(patientUuid, item.key)}
           />

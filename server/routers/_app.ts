@@ -5,6 +5,8 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { toPatient } from "../adapters";
+import type { Patient } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
     let result = strings.reduce((acc, str, i) => {
@@ -303,7 +305,8 @@ export const appRouter = router({
             }
         }),
 
-    patient: protectedProcedure.query(async ({ ctx }) => {
+    patient: protectedProcedure.query(async ({ ctx }): Promise<Patient> => {
+        // Identity is derived from the verified token (ctx.auth.uuid), never the URL.
         const patients = await ctx.clients.OdooAPI.rpc<
             {
                 uuid: string;
@@ -323,7 +326,21 @@ export const appRouter = router({
             },
         });
 
-        return patients?.[0];
+        // The patient's facility name lives on the ERP, not res.partner. Fetch it
+        // tolerantly: a failure here must never break the profile (graceful degrade
+        // to just the server code). This is a read-only GET.
+        let hospitalName: string | undefined;
+        try {
+            const hospital = await ctx.clients.OdooAPI<{ name: string }>(
+                "api/hospital",
+            );
+            hospitalName = hospital?.name;
+        } catch {
+            hospitalName = undefined;
+        }
+
+        // Always return a stable DTO; the UI speaks Patient, never raw partner rows.
+        return toPatient(patients?.[0] ?? {}, hospitalName, ctx.auth.server);
     }),
     patientActiveMedications: protectedProcedure.query(async ({ ctx }) => {
         const response = await ctx.clients.OpenmrsAPI<{

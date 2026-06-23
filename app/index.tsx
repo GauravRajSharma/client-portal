@@ -8,12 +8,18 @@ export default function Index() {
 
   if (isLoading)
     return (
-      <YStack flex={1} height="100vh" justify="center" items="center" bg="$background">
+      <YStack
+        flex={1}
+        height="100vh"
+        justify="center"
+        items="center"
+        bg="$background"
+      >
         <Spinner size="large" color="$accent9" />
       </YStack>
     );
 
-  if (!data) return <Redirect href="/auth/login" />;
+  if (!data?.id) return <Redirect href="/auth/login" />;
 
-  return <Redirect href={`/patient/${data.uuid}/home` as any} />;
+  return <Redirect href={`/patient/${data.id}/home` as any} />;
 }
