@@ -1,27 +1,46 @@
 import React from "react";
 import { router, useGlobalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { ArrowLeft, CheckCircle, CreditCard, ShieldCheck } from "@tamagui/lucide-icons";
-import { Button, Text, XStack, YStack } from "tamagui";
+import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck } from "@tamagui/lucide-icons";
+import { Button, Input, Spinner, Text, XStack, YStack } from "tamagui";
 
 import { trpc } from "@/utils/trpc";
-import {
-  AuthError,
-  AuthField,
-  AuthSelectField,
-  AuthSubmit,
-  friendlyAuthError,
-} from "@/components/auth/input";
+import { friendlyAuthError } from "@/components/auth/input";
 import { HospitalSelect } from "@/components/auth/sign-in";
 import { ScanVisitTicket } from "@/components/auth/scan";
-import { AuthLayout, FormStack } from "@/components/auth/layout";
+import { AuthLayout } from "@/components/auth/layout";
 import { Skeleton } from "@/components/ui";
 
 type SignInForm = { mrn: string; server: string };
 
-/** The working sign-in: hospital + MRN (+ scan), routed to 2FA verify. Its own page. */
+/** A labelled field with optional inline error. */
+function FieldRow({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <YStack gap="$1.5">
+      <Text fontSize={12.5} fontWeight="700" color="$text2">
+        {label}
+      </Text>
+      {children}
+      {error ? (
+        <Text fontSize={12} color="$bad">
+          {error}
+        </Text>
+      ) : null}
+    </YStack>
+  );
+}
+
+/** Hospital record sign-in: pick hospital + MRN (or scan), then 2FA verify. */
 export default function HospitalSignIn() {
-  // When launched from the app-account "Add hospital" flow, carry the claim flag to verify.
+  // Launched from the app-account "Add hospital" flow -> carry the claim flag to verify.
   const { claim } = useGlobalSearchParams<{ claim?: string }>();
 
   const {
@@ -36,27 +55,23 @@ export default function HospitalSignIn() {
 
   const {
     data: hospitals,
-    isLoading: isHospitalsLoading,
-    isError: isHospitalsError,
+    isLoading: hospitalsLoading,
+    isError: hospitalsError,
     refetch: refetchHospitals,
-    isRefetching: isHospitalsRefetching,
+    isRefetching,
   } = trpc.hospitals.useQuery();
 
   const { mutateAsync: signIn, isPending, error } = trpc.signIn.useMutation();
-
   const selectedServer = watch("server");
-  const mrnValue = watch("mrn");
-  const selectedHospital = hospitals?.find((h) => h.hospital.server === selectedServer);
-  const hospitalsReady = Boolean(hospitals && hospitals.length > 0);
 
-  const handleSignIn = async (data: SignInForm) => {
+  const go = async (data: SignInForm) => {
     try {
-      const response = await signIn(data);
-      if (response?.verification) {
+      const r = await signIn(data);
+      if (r?.verification) {
         const q = new URLSearchParams({
-          token: response.cookie,
-          field: response.verification.field.label,
-          value: response.verification.field.value,
+          token: r.cookie,
+          field: r.verification.field.label,
+          value: r.verification.field.value,
           ...(claim === "1" ? { claim: "1" } : {}),
         }).toString();
         router.push(`/auth/verify?${q}`);
@@ -66,18 +81,15 @@ export default function HospitalSignIn() {
     }
   };
 
-  const handleScan = (data: string) => {
-    const mrn = data.trim();
+  const onScan = (raw: string) => {
+    const mrn = raw.trim();
     setValue("mrn", mrn, { shouldValidate: true });
     if (!selectedServer) {
-      setError("server", {
-        type: "required",
-        message: "First choose your hospital, then scan your ticket.",
-      });
+      setError("server", { type: "required", message: "Choose your hospital first." });
       return;
     }
     clearErrors("server");
-    handleSignIn({ mrn, server: selectedServer });
+    go({ mrn, server: selectedServer });
   };
 
   return (
@@ -85,10 +97,9 @@ export default function HospitalSignIn() {
       <XStack
         items="center"
         gap="$2"
+        self="flex-start"
         onPress={() => router.back()}
         pressStyle={{ opacity: 0.6 }}
-        cursor="pointer"
-        mb="$1"
       >
         <ArrowLeft size={18} color="$text2" />
         <Text fontSize={14} fontWeight="500" color="$text2">
@@ -96,134 +107,125 @@ export default function HospitalSignIn() {
         </Text>
       </XStack>
 
-      <YStack gap="$1" mb="$1">
-        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
-          Sign in from your hospital
+      <YStack gap="$1">
+        <Text fontSize={22} fontWeight="800" color="$color12" letterSpacing={-0.4}>
+          {claim === "1" ? "Add a hospital" : "Sign in with your hospital"}
         </Text>
-        <Text fontSize={14} color="$text2">
+        <Text fontSize={13.5} color="$text2">
           Use the record number from your hospital card or visit ticket.
         </Text>
       </YStack>
 
-      {selectedHospital ? (
-        <XStack items="center" gap="$2.5" px="$3" py="$2.5" rounded={12} bg="$primarySoft">
-          <ShieldCheck size={16} color="$primary" />
-          <Text fontSize={13} color="$color12" flex={1} numberOfLines={1}>
-            Signing in to{" "}
-            <Text fontWeight="700" color="$color12">
-              {selectedHospital.name}
-            </Text>
-          </Text>
-        </XStack>
-      ) : null}
-
-      <FormStack>
-        {isHospitalsError || (!isHospitalsLoading && !hospitalsReady) ? (
-          <AuthSelectField
-            label="Hospital"
-            htmlFor="hospital"
-            error={
-              isHospitalsError
-                ? "We could not load the hospital list. Please try again."
-                : "No hospitals are available right now. Please try again shortly."
-            }
-          >
+      <YStack gap="$3">
+        <FieldRow label="Hospital" error={errors.server?.message}>
+          {hospitalsLoading ? (
+            <Skeleton height={50} rounded={14} width="100%" />
+          ) : hospitalsError || !hospitals?.length ? (
             <Button
-              height={52}
+              height={50}
               rounded={14}
               bg="$surface"
               borderWidth={1}
-              borderColor="$borderStrong"
-              disabled={isHospitalsRefetching}
+              borderColor="$border"
+              disabled={isRefetching}
               onPress={() => refetchHospitals()}
             >
-              <Button.Text fontSize="$4" fontWeight="700" color="$color12">
-                {isHospitalsRefetching ? "Trying again" : "Try again"}
-              </Button.Text>
+              <Text fontSize={14} fontWeight="700" color="$color12">
+                {isRefetching ? "Trying again…" : "Couldn't load hospitals — retry"}
+              </Text>
             </Button>
-          </AuthSelectField>
-        ) : isHospitalsLoading ? (
-          <YStack gap="$2">
-            <Skeleton height={16} width="30%" rounded="$3" />
-            <Skeleton height={52} rounded={14} width="100%" />
-          </YStack>
-        ) : (
-          <Controller
-            control={control}
-            rules={{ required: "Choose your hospital to continue." }}
-            name="server"
-            render={({ field: { onChange, value } }) => (
-              <AuthSelectField
-                label="Hospital"
-                htmlFor="hospital"
-                helper="Your records are kept at one hospital."
-                error={errors.server?.message}
-              >
+          ) : (
+            <Controller
+              control={control}
+              rules={{ required: "Choose your hospital to continue." }}
+              name="server"
+              render={({ field: { onChange, value } }) => (
                 <HospitalSelect
                   id="hospital"
-                  items={hospitals ?? []}
+                  items={hospitals}
                   invalid={Boolean(errors.server)}
-                  value={hospitals?.find((h) => h.hospital.server === value)?.name}
+                  value={hospitals.find((h) => h.hospital.server === value)?.name}
                   onValueChange={(name) =>
-                    onChange(
-                      hospitals?.find((h) => h.name === name)?.hospital.server ?? "",
-                    )
+                    onChange(hospitals.find((h) => h.name === name)?.hospital.server ?? "")
                   }
                 />
-              </AuthSelectField>
-            )}
-          />
-        )}
-
-        <Controller
-          control={control}
-          rules={{
-            required: "Enter your Medical Record Number.",
-            minLength: { value: 4, message: "That MRN looks too short." },
-          }}
-          name="mrn"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <AuthField
-              label="Medical Record Number (MRN)"
-              nativeID="mrn"
-              Icon={CreditCard}
-              value={value}
-              onChangeText={(t) => onChange(t.trim())}
-              onBlur={onBlur}
-              placeholder="ABCD123456"
-              helper="Printed on your hospital card or visit ticket sticker."
-              error={errors.mrn?.message}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              autoComplete="off"
-              returnKeyType="go"
-              onSubmitEditing={handleSubmit(handleSignIn)}
+              )}
             />
           )}
-        />
+        </FieldRow>
 
-        {mrnValue && !errors.mrn ? (
-          <XStack items="center" gap="$2" px="$1">
-            <CheckCircle size={15} color="$good" />
-            <Text fontSize={12} color="$text2">
-              Record number captured.
-            </Text>
-          </XStack>
+        <FieldRow label="Medical record number (MRN)" error={errors.mrn?.message}>
+          <Controller
+            control={control}
+            rules={{
+              required: "Enter your medical record number.",
+              minLength: { value: 4, message: "That MRN looks too short." },
+            }}
+            name="mrn"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <XStack
+                height={50}
+                rounded={14}
+                borderWidth={1}
+                borderColor={errors.mrn ? "$bad" : "$border"}
+                bg="$surface2"
+                items="center"
+                px="$3.5"
+                gap="$2.5"
+                focusWithinStyle={{ borderColor: "$primary" }}
+              >
+                <CreditCard size={18} color="$text3" />
+                <Input
+                  unstyled
+                  flex={1}
+                  fontSize={15}
+                  color="$color12"
+                  placeholder="ABCD123456"
+                  placeholderTextColor="$text3"
+                  value={value}
+                  onChangeText={(t) => onChange(t.trim())}
+                  onBlur={onBlur}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  returnKeyType="go"
+                  onSubmitEditing={handleSubmit(go)}
+                />
+              </XStack>
+            )}
+          />
+        </FieldRow>
+
+        {error ? (
+          <Text fontSize={12.5} color="$bad">
+            {friendlyAuthError(error, "signin")}
+          </Text>
         ) : null}
 
-        <AuthError message={friendlyAuthError(error, "signin")} />
+        <Button
+          height={52}
+          rounded={14}
+          bg="$primary"
+          borderWidth={0}
+          pressStyle={{ bg: "$primaryStrong" }}
+          opacity={isPending ? 0.7 : 1}
+          onPress={isPending ? undefined : handleSubmit(go)}
+        >
+          <XStack items="center" gap="$2.5">
+            {isPending ? (
+              <Spinner color="$onPrimary" />
+            ) : (
+              <ShieldCheck size={18} color="$onPrimary" />
+            )}
+            <Text fontSize={16} fontWeight="700" color="$onPrimary">
+              {isPending ? "Checking your record…" : "Continue"}
+            </Text>
+            {!isPending ? <ArrowRight size={18} color="$onPrimary" /> : null}
+          </XStack>
+        </Button>
+      </YStack>
 
-        <AuthSubmit
-          label="Continue"
-          pendingLabel="Checking your record"
-          pending={isPending}
-          disabled={!hospitalsReady}
-          Icon={ShieldCheck}
-          onPress={handleSubmit(handleSignIn)}
-        />
-      </FormStack>
-
-      <ScanVisitTicket onScan={handleScan} />
+      <ScanVisitTicket onScan={onScan} />
     </AuthLayout>
   );
 }
