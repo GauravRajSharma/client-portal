@@ -23,5 +23,10 @@ export const BETTER_AUTH_SECRET: string =
 export const AUTH_DB_PATH: string =
   process.env.AUTH_DB_PATH ?? `${process.cwd()}/server/data/auth.db`;
 
+// Passkey (WebAuthn) — the web biometric login path. rpID is the bare domain (no scheme
+// or port); origin is the full page origin. Both MUST be the real domain in production.
+export const PASSKEY_RP_ID: string = process.env.PASSKEY_RP_ID ?? "localhost";
+export const PASSKEY_ORIGIN: string = process.env.PASSKEY_ORIGIN ?? "http://localhost:8081";
+
 // ponytail: backend basic-auth creds are still inline in server/lib/clients.ts
 // (pre-existing). Move them here behind env vars when rotating credentials.

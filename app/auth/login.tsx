@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { router } from "expo-router";
 import {
   ArrowRight,
+  Fingerprint,
   Hospital,
   Lock,
   Mail,
@@ -94,6 +96,32 @@ function AppAccount() {
     }
   };
 
+  // Web only: sign in with a registered passkey (WebAuthn — uses the browser's biometrics).
+  // Resolved after mount (client-only) so it never trips SSR hydration, and only where
+  // the browser actually supports WebAuthn.
+  const [passkeyAvailable, setPasskeyAvailable] = useState(false);
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined" && (window as any).PublicKeyCredential) {
+      setPasskeyAvailable(true);
+    }
+  }, []);
+  const signInWithPasskey = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await (authClient as any).signIn.passkey();
+      if (res?.error) {
+        setError(res.error.message ?? "Couldn't sign in with a passkey.");
+        return;
+      }
+      router.replace("/auth/hospitals" as any);
+    } catch (e: any) {
+      setError(e?.message ?? "Couldn't sign in with a passkey.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <YStack gap="$2.5" p="$3.5" rounded={16} borderWidth={1} borderColor="$border" bg="$surface">
       <Text fontSize={13} fontWeight="700" color="$color12">
@@ -144,6 +172,25 @@ function AppAccount() {
           </Text>
         )}
       </Button>
+
+      {passkeyAvailable && mode === "signin" ? (
+        <Button
+          height={44}
+          rounded={12}
+          bg="$surface2"
+          borderWidth={1}
+          borderColor="$border"
+          pressStyle={{ opacity: 0.8 }}
+          onPress={busy ? undefined : signInWithPasskey}
+        >
+          <XStack items="center" gap="$2">
+            <Fingerprint size={17} color="$primary" />
+            <Text fontSize={13.5} fontWeight="700" color="$primary">
+              Sign in with a passkey
+            </Text>
+          </XStack>
+        </Button>
+      ) : null}
 
       <XStack justify="center" gap="$1.5" pt="$0.5">
         <Text fontSize={12.5} color="$text2">

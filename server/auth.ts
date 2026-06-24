@@ -9,7 +9,13 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "./lib/nodeSqlite";
 import { betterAuth } from "better-auth";
 import { expo } from "@better-auth/expo";
-import { AUTH_DB_PATH, BETTER_AUTH_SECRET } from "./config/env";
+import { passkey } from "@better-auth/passkey";
+import {
+  AUTH_DB_PATH,
+  BETTER_AUTH_SECRET,
+  PASSKEY_ORIGIN,
+  PASSKEY_RP_ID,
+} from "./config/env";
 
 mkdirSync(dirname(AUTH_DB_PATH), { recursive: true });
 
@@ -34,7 +40,12 @@ export const auth = betterAuth({
   secret: BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:8081",
   emailAndPassword: { enabled: true },
-  plugins: [expo()],
+  plugins: [
+    expo(),
+    // WebAuthn passkeys — phishing-resistant login on web (uses the platform's own
+    // Face ID / fingerprint / PIN). Native uses the biometric app-lock instead.
+    passkey({ rpID: PASSKEY_RP_ID, rpName: "Patient Portal", origin: PASSKEY_ORIGIN }),
+  ],
   // Native deep-link scheme + Expo dev + the web origin(s) that may post here.
   trustedOrigins: ["ehrplus://", "exp://", "exp://*", "http://localhost:8081"],
 });

@@ -12,9 +12,14 @@ const config = getDefaultConfig(__dirname, {
 // falls back to its built-in no-op tracer (an empty module would wrongly "succeed").
 const path = require("node:path");
 const OTEL_STUB = path.resolve(__dirname, "server/lib/otelStub.js");
+// tslib's CJS build has no `.default`; the passkey plugin's ESM deps (@peculiar/*) read it.
+const TSLIB_SHIM = path.resolve(__dirname, "server/lib/tslibShim.js");
 config.resolver.resolveRequest = (context, moduleName, platform) => {
 	if (moduleName === "@opentelemetry/api" || moduleName.startsWith("@opentelemetry/")) {
 		return { type: "sourceFile", filePath: OTEL_STUB };
+	}
+	if (moduleName === "tslib") {
+		return { type: "sourceFile", filePath: TSLIB_SHIM };
 	}
 	return context.resolveRequest(context, moduleName, platform);
 };

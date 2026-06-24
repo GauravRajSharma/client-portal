@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import { trpc } from "@/utils/trpc";
 import { authClient } from "@/utils/authClient";
+import { SecuritySettings } from "@/components/security-settings";
 
 export default function MyHospitals() {
   const { data, isLoading, isError, refetch } = trpc.myHospitals.useQuery();
@@ -139,6 +140,9 @@ export default function MyHospitals() {
           })}
         </YStack>
       )}
+
+      {/* Account-level security: passkey (web) / biometric unlock (mobile). */}
+      <SecuritySettings />
 
       <XStack gap="$2.5" p="$3" rounded={12} bg="$surface2" items="flex-start" mt="$1">
         <ShieldCheck size={15} color="$text3" style={{ marginTop: 2 }} />

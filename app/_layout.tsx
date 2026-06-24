@@ -32,6 +32,7 @@ import { Alert, Platform } from "react-native";
 import { persister, webNoPersist } from "@/utils/mmkv";
 import { usePrivacy } from "@/utils/privacy";
 import { authClient } from "@/utils/authClient";
+import { BiometricLock } from "@/components/biometric-lock";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -121,7 +122,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
           <PortalProvider>
-            <Stack screenOptions={{ headerShown: false }} />
+            <BiometricLock>
+              <Stack screenOptions={{ headerShown: false }} />
+            </BiometricLock>
           </PortalProvider>
         </SafeAreaView>
       </SafeAreaProvider>

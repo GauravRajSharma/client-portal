@@ -10,6 +10,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { PiiKind } from "@/utils/privacy";
+import { SecuritySettings } from "@/components/security-settings";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -339,6 +340,8 @@ export default function Profile() {
           ))}
         </Panel>
       </Section>
+
+      <SecuritySettings />
 
       <Separator borderColor="$borderColor" my="$2" />
       <SignOutButton />

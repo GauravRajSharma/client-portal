@@ -41,3 +41,4 @@ app-example
 
 # Better Auth SQLite (runtime data, never commit)
 server/data/
+.playwright-mcp/

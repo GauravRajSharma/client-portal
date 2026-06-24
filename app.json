@@ -47,7 +47,13 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Personal Health Records to use Face ID to unlock your records."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
