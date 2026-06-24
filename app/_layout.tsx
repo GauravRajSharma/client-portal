@@ -32,6 +32,7 @@ import { Alert, Platform } from "react-native";
 import { persister, webNoPersist } from "@/utils/mmkv";
 import { usePrivacy } from "@/utils/privacy";
 import { authClient } from "@/utils/authClient";
+import { apiOrigin } from "@/utils/api";
 import { BiometricLock } from "@/components/biometric-lock";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -67,11 +68,11 @@ const trpcClient = trpc.createClient({
       fetch(url: any, options: any) {
         return fetch(url, options);
       },
-      url: Platform.select({
-        native: "http://192.168.250.118:8081/api/trpc",
-        web: `${globalThis?.location?.origin ?? "-"}/api/trpc`,
-        default: "http://192.168.250.118:8081/api/trpc",
-      }),
+      // Web: same-origin. Native: apiOrigin (prod gateway, or EXPO_PUBLIC_API_ORIGIN in dev).
+      url:
+        Platform.OS === "web"
+          ? `${globalThis?.location?.origin ?? "-"}/api/trpc`
+          : `${apiOrigin}/api/trpc`,
 
       // You can pass any HTTP headers you wish here
       async headers() {
