@@ -47652,32 +47652,32 @@ var import_core57 = require("@tamagui/core");
 
 // tamagui.config.ts
 var darkPalette2 = [
-  "hsla(0, 15%, 1%, 1)",
-  "hsla(0, 15%, 6%, 1)",
-  "hsla(0, 15%, 12%, 1)",
-  "hsla(0, 15%, 17%, 1)",
-  "hsla(0, 15%, 23%, 1)",
-  "hsla(0, 15%, 28%, 1)",
-  "hsla(0, 16%, 34%, 1)",
-  "hsla(0, 16%, 39%, 1)",
-  "hsla(0, 16%, 45%, 1)",
-  "hsla(0, 16%, 50%, 1)",
-  "hsla(0, 15%, 93%, 1)",
-  "hsla(0, 15%, 99%, 1)"
+  "hsla(214, 38%, 8%, 1)",
+  "hsla(213, 34%, 12%, 1)",
+  "hsla(213, 30%, 16%, 1)",
+  "hsla(213, 26%, 21%, 1)",
+  "hsla(213, 22%, 26%, 1)",
+  "hsla(213, 18%, 32%, 1)",
+  "hsla(213, 16%, 40%, 1)",
+  "hsla(212, 16%, 50%, 1)",
+  "hsla(211, 18%, 62%, 1)",
+  "hsla(210, 22%, 74%, 1)",
+  "hsla(208, 40%, 91%, 1)",
+  "hsla(208, 50%, 97%, 1)"
 ];
 var lightPalette2 = [
-  "hsla(0, 15%, 99%, 1)",
-  "hsla(0, 15%, 94%, 1)",
-  "hsla(0, 15%, 88%, 1)",
-  "hsla(0, 15%, 83%, 1)",
-  "hsla(0, 15%, 77%, 1)",
-  "hsla(0, 15%, 72%, 1)",
-  "hsla(0, 16%, 66%, 1)",
-  "hsla(0, 16%, 61%, 1)",
-  "hsla(0, 16%, 55%, 1)",
-  "hsla(0, 16%, 50%, 1)",
-  "hsla(0, 15%, 15%, 1)",
-  "hsla(0, 15%, 1%, 1)"
+  "hsla(214, 45%, 98%, 1)",
+  "hsla(214, 40%, 95%, 1)",
+  "hsla(214, 34%, 91%, 1)",
+  "hsla(214, 28%, 86%, 1)",
+  "hsla(214, 24%, 79%, 1)",
+  "hsla(214, 20%, 70%, 1)",
+  "hsla(214, 16%, 59%, 1)",
+  "hsla(214, 16%, 49%, 1)",
+  "hsla(214, 20%, 39%, 1)",
+  "hsla(214, 28%, 28%, 1)",
+  "hsla(214, 45%, 16%, 1)",
+  "hsla(214, 55%, 10%, 1)"
 ];
 var lightShadows2 = {
   shadow1: "rgba(0,0,0,0.04)",
@@ -47708,46 +47708,92 @@ var builtThemes = createThemes({
         ...red2,
         ...yellow2,
         ...lightShadows2,
-        shadowColor: lightShadows2.shadow1
+        shadowColor: lightShadows2.shadow1,
+        // --- Deltalab named tokens (exact). New UI uses these: $primary, $surface, etc.
+        appBg: "#eef2fc",
+        surface: "#ffffff",
+        surface2: "#f2f6fc",
+        surface3: "#e9eff7",
+        border: "rgba(15,40,80,0.12)",
+        borderStrong: "rgba(15,40,80,0.2)",
+        text2: "#46566a",
+        text3: "#7c8b9e",
+        primary: "#0b4ea0",
+        primaryStrong: "#083a78",
+        primarySoft: "#e5edf9",
+        onPrimary: "#ffffff",
+        brand: "#1b6fc2",
+        brandSoft: "#e7f0fb",
+        good: "#1f9d6b",
+        goodSoft: "#e2f4ec",
+        warn: "#c8860d",
+        warnSoft: "#fbf0d8",
+        bad: "#d6453d",
+        badSoft: "#fbe5e4",
+        chartGrid: "#e6edf4",
+        ring: "rgba(11,78,160,0.28)"
       },
       dark: {
         ...green,
         ...red,
         ...yellow,
         ...darkShadows2,
-        shadowColor: darkShadows2.shadow1
+        shadowColor: darkShadows2.shadow1,
+        appBg: "#0a1626",
+        surface: "#11233a",
+        surface2: "#16283e",
+        surface3: "#1d3047",
+        border: "rgba(255,255,255,0.12)",
+        borderStrong: "rgba(255,255,255,0.2)",
+        text2: "#9cafc3",
+        text3: "#6a7f96",
+        primary: "#5a9af0",
+        primaryStrong: "#7fb2f5",
+        primarySoft: "#0f2c52",
+        onPrimary: "#04203f",
+        brand: "#6aa8f7",
+        brandSoft: "#0e2c46",
+        good: "#34c98a",
+        goodSoft: "#0f3328",
+        warn: "#e0a836",
+        warnSoft: "#3a2e10",
+        bad: "#f0625a",
+        badSoft: "#3a1b1a",
+        chartGrid: "#1c3349",
+        ring: "rgba(90,154,240,0.32)"
       }
     }
   },
+  // Deltalab clinical blue (~#0b4ea0). Primary actions, current selection, focus.
   accent: {
     palette: {
       dark: [
-        "hsla(250, 50%, 35%, 1)",
-        "hsla(250, 50%, 38%, 1)",
-        "hsla(250, 50%, 41%, 1)",
-        "hsla(250, 50%, 43%, 1)",
-        "hsla(250, 50%, 46%, 1)",
-        "hsla(250, 50%, 49%, 1)",
-        "hsla(250, 50%, 52%, 1)",
-        "hsla(250, 50%, 54%, 1)",
-        "hsla(250, 50%, 57%, 1)",
-        "hsla(250, 50%, 60%, 1)",
-        "hsla(250, 50%, 90%, 1)",
-        "hsla(250, 50%, 95%, 1)"
+        "hsla(212, 70%, 30%, 1)",
+        "hsla(212, 72%, 34%, 1)",
+        "hsla(212, 74%, 38%, 1)",
+        "hsla(212, 76%, 42%, 1)",
+        "hsla(211, 78%, 47%, 1)",
+        "hsla(210, 80%, 52%, 1)",
+        "hsla(209, 82%, 58%, 1)",
+        "hsla(208, 85%, 64%, 1)",
+        "hsla(208, 88%, 71%, 1)",
+        "hsla(207, 90%, 80%, 1)",
+        "hsla(208, 80%, 91%, 1)",
+        "hsla(208, 80%, 96%, 1)"
       ],
       light: [
-        "hsla(250, 50%, 40%, 1)",
-        "hsla(250, 50%, 43%, 1)",
-        "hsla(250, 50%, 46%, 1)",
-        "hsla(250, 50%, 48%, 1)",
-        "hsla(250, 50%, 51%, 1)",
-        "hsla(250, 50%, 54%, 1)",
-        "hsla(250, 50%, 57%, 1)",
-        "hsla(250, 50%, 59%, 1)",
-        "hsla(250, 50%, 62%, 1)",
-        "hsla(250, 50%, 65%, 1)",
-        "hsla(250, 50%, 95%, 1)",
-        "hsla(250, 50%, 95%, 1)"
+        "hsla(212, 86%, 28%, 1)",
+        "hsla(212, 86%, 31%, 1)",
+        "hsla(212, 85%, 34%, 1)",
+        "hsla(212, 83%, 38%, 1)",
+        "hsla(211, 80%, 42%, 1)",
+        "hsla(210, 78%, 47%, 1)",
+        "hsla(209, 78%, 53%, 1)",
+        "hsla(208, 82%, 61%, 1)",
+        "hsla(208, 86%, 70%, 1)",
+        "hsla(207, 90%, 82%, 1)",
+        "hsla(208, 70%, 95%, 1)",
+        "hsla(208, 70%, 97%, 1)"
       ]
     }
   },
@@ -47773,8 +47819,34 @@ var builtThemes = createThemes({
   }
 });
 var themes2 = process.env.TAMAGUI_ENVIRONMENT === "client" && process.env.NODE_ENV === "production" ? {} : builtThemes;
+var sansFont = {
+  ...defaultConfig.fonts.body,
+  family: "IBMPlexSans_400Regular",
+  face: {
+    400: { normal: "IBMPlexSans_400Regular" },
+    500: { normal: "IBMPlexSans_500Medium" },
+    600: { normal: "IBMPlexSans_600SemiBold" },
+    700: { normal: "IBMPlexSans_700Bold" }
+  }
+};
+var monoFont = {
+  ...defaultConfig.fonts.body,
+  family: "IBMPlexMono_400Regular",
+  face: {
+    400: { normal: "IBMPlexMono_400Regular" },
+    500: { normal: "IBMPlexMono_500Medium" },
+    600: { normal: "IBMPlexMono_600SemiBold" },
+    700: { normal: "IBMPlexMono_600SemiBold" }
+  }
+};
 var tamaguiConfig = createTamagui({
   ...defaultConfig,
+  fonts: {
+    ...defaultConfig.fonts,
+    heading: sansFont,
+    body: sansFont,
+    mono: monoFont
+  },
   themes: themes2
 });
 var tamagui_config_default = tamaguiConfig;

@@ -1,34 +1,28 @@
-import { Check, Clock, Info, Pill, RefreshCw } from "@tamagui/lucide-icons";
+import { Clock, Info, Pill, RefreshCw } from "@tamagui/lucide-icons";
 import type { NamedExoticComponent } from "react";
-import { Separator, Text, XStack, YStack, useMedia } from "tamagui";
+import { Text, XStack, YStack, useMedia } from "tamagui";
 import {
+  DLCard,
+  DLScreen,
+  DLStatusPill,
+  DLTitle,
   EmptyState,
   ErrorState,
-  Panel,
-  Screen,
-  Section,
   SkeletonList,
-  StatusPill,
 } from "@/components/ui";
 import type { Medication } from "@/server/dto";
 import { trpc } from "@/utils/trpc";
 
-/**
- * Compose the human-readable medicine title: "Name 500 mg" with the form below.
- * Strength is part of identity (a patient recognises the box by it), so it sits
- * with the name rather than buried in the dosing line.
- */
-function medicineTitle(m: Medication): string {
+function medicineTitle(m: Medication) {
   return [m.name, m.strength].filter(Boolean).join(" ");
 }
 
-/** Capitalise the first letter only; keep the rest as the backend cleaned it. */
-function sentence(s?: string): string | undefined {
+function sentence(s?: string) {
   if (!s) return undefined;
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Common clinical route codes -> plain patient language. Falls back to the raw value. */
+// Clinical codes -> plain patient language. Falls back to the raw value.
 const ROUTE_WORDS: Record<string, string> = {
   oral: "by mouth",
   "by mouth": "by mouth",
@@ -45,8 +39,6 @@ const ROUTE_WORDS: Record<string, string> = {
   ophthalmic: "into the eye",
   nasal: "into the nose",
 };
-
-/** Common frequency abbreviations -> plain language, so we never show "bid" etc. */
 const FREQUENCY_WORDS: Record<string, string> = {
   od: "once a day",
   "q.d.": "once a day",
@@ -61,57 +53,16 @@ const FREQUENCY_WORDS: Record<string, string> = {
   prn: "only when needed",
   stat: "right away",
 };
+const humanRoute = (r?: string) => (r ? (ROUTE_WORDS[r.trim().toLowerCase()] ?? r) : undefined);
+const humanFrequency = (f?: string) => (f ? (FREQUENCY_WORDS[f.trim().toLowerCase()] ?? f) : undefined);
 
-function humanRoute(route?: string): string | undefined {
-  if (!route) return undefined;
-  return ROUTE_WORDS[route.trim().toLowerCase()] ?? route;
-}
-
-function humanFrequency(freq?: string): string | undefined {
-  if (!freq) return undefined;
-  return FREQUENCY_WORDS[freq.trim().toLowerCase()] ?? freq;
-}
-
-/** A single "how to take it" fact: icon, quiet label, plain-language value. */
-function DoseFact({
-  Icon,
-  label,
-  value,
-}: {
-  Icon: NamedExoticComponent<any>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <XStack items="flex-start" gap="$2.5" flex={1} minW={150}>
-      <YStack pt="$0.5">
-        <Icon size={16} color="$color9" />
-      </YStack>
-      <YStack gap="$0.5" flex={1}>
-        <Text fontSize="$1" fontWeight="700" color="$color9" textTransform="uppercase">
-          {label}
-        </Text>
-        <Text fontSize="$4" fontWeight="600" color="$color12" numberOfLines={2}>
-          {value}
-        </Text>
-      </YStack>
-    </XStack>
-  );
-}
-
-/**
- * The dosing line a patient actually reads: "Take 1 tablet by mouth, twice a day".
- * Built defensively so a missing field never produces a dangling phrase. When we
- * have nothing concrete, we never invent an instruction.
- */
+/** "Take 1 tablet by mouth, twice a day." Never invents a missing instruction. */
 function dosingSentence(m: Medication): string {
   const amount = [m.dose, m.doseUnit].filter(Boolean).join(" ");
   const route = humanRoute(m.route);
   const freq = humanFrequency(m.frequency);
-  if (!amount && !route && !freq) {
-    return "Take as directed by your doctor.";
-  }
-  const parts: string[] = ["Take"];
+  if (!amount && !route && !freq) return "Take as directed by your doctor.";
+  const parts = ["Take"];
   if (amount) parts.push(amount);
   if (route) parts.push(route);
   let line = parts.join(" ");
@@ -119,118 +70,106 @@ function dosingSentence(m: Medication): string {
   return `${line}.`;
 }
 
-function MedicineCard({ medicine }: { medicine: Medication }) {
-  const ongoing =
-    !medicine.durationLabel ||
-    medicine.durationLabel === "indefinite" ||
-    /indefinite/i.test(medicine.durationLabel);
-  const durationValue = ongoing ? "Ongoing" : sentence(medicine.durationLabel) ?? "Ongoing";
-  const hasRefills = medicine.refills !== undefined && medicine.refills > 0;
+function Fact({ Icon, label, value }: { Icon: NamedExoticComponent<any>; label: string; value: string }) {
+  return (
+    <XStack items="flex-start" gap="$2" flex={1} minW={130}>
+      <YStack mt="$0.5">
+        <Icon size={15} color="$text3" />
+      </YStack>
+      <YStack gap="$0.5" flex={1}>
+        <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
+          {label}
+        </Text>
+        <Text fontSize={13.5} fontWeight="600" color="$color12" numberOfLines={2}>
+          {value}
+        </Text>
+      </YStack>
+    </XStack>
+  );
+}
+
+function MedicineCard({ m }: { m: Medication }) {
+  const ongoing = !m.durationLabel || /indefinite/i.test(m.durationLabel);
+  const durationValue = ongoing ? "Ongoing" : sentence(m.durationLabel) ?? "Ongoing";
+  const hasRefills = m.refills !== undefined && m.refills > 0;
 
   return (
-    <Panel gap="$3.5">
-      {/* Identity: name + strength prominent, form + active status secondary */}
+    <DLCard p="$4" gap="$3.5">
       <XStack items="flex-start" justify="space-between" gap="$3">
-        <XStack items="flex-start" gap="$2.5" flex={1}>
-          <YStack p="$2" rounded="$4" bg="$color3" mt="$0.5">
-            <Pill size={20} color="$color11" />
+        <XStack items="flex-start" gap="$3" flex={1} minW={0}>
+          <YStack width={40} height={40} rounded={11} bg="$primarySoft" items="center" justify="center" mt="$0.5">
+            <Pill size={20} color="$primary" />
           </YStack>
-          <YStack gap="$1" flex={1}>
-            <Text fontSize="$7" fontWeight="800" color="$color12" numberOfLines={2}>
-              {medicineTitle(medicine)}
+          <YStack flex={1} gap="$0.5" minW={0}>
+            <Text fontSize={17} fontWeight="800" color="$color12" numberOfLines={2}>
+              {medicineTitle(m)}
             </Text>
-            {medicine.form ? (
-              <Text fontSize="$3" color="$color10">
-                {sentence(medicine.form)}
+            {m.form ? (
+              <Text fontSize={12.5} color="$text2">
+                {sentence(m.form)}
               </Text>
             ) : null}
           </YStack>
         </XStack>
-        {medicine.active ? (
-          <StatusPill label="Active" theme="success" Icon={Check} size="sm" />
+        {m.active ? (
+          <DLStatusPill label="Active" color="$good" soft="$goodSoft" size="sm" />
         ) : (
-          <StatusPill label="Stopped" theme="neutral" size="sm" />
+          <DLStatusPill label="Stopped" color="$text3" soft="$surface3" size="sm" />
         )}
       </XStack>
 
-      {/* The reassuring, scannable "how to take it" line */}
-      <YStack
-        bg="$color2"
-        rounded="$5"
-        px="$3.5"
-        py="$3"
-        gap="$1"
-        borderColor="$borderColor"
-        borderWidth={1}
-      >
-        <Text fontSize="$1" fontWeight="700" color="$color9" textTransform="uppercase">
+      {/* How to take it */}
+      <YStack bg="$surface2" rounded={12} px="$3.5" py="$3" gap="$1" borderWidth={1} borderColor="$border">
+        <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
           How to take it
         </Text>
-        <Text fontSize="$5" fontWeight="600" color="$color12">
-          {dosingSentence(medicine)}
+        <Text fontSize={15} fontWeight="600" color="$color12">
+          {dosingSentence(m)}
         </Text>
       </YStack>
 
-      {/*
-        Supporting facts that the dosing sentence does NOT already carry, so the
-        card never repeats itself. Duration and refills only.
-      */}
-      <XStack flexWrap="wrap" rowGap="$3" columnGap="$4">
-        <DoseFact Icon={Clock} label="Duration" value={durationValue} />
-        {hasRefills ? (
-          <DoseFact
-            Icon={RefreshCw}
-            label="Refills left"
-            value={String(medicine.refills)}
-          />
-        ) : null}
+      <XStack flexWrap="wrap" rowGap="$3" columnGap="$3">
+        <Fact Icon={Clock} label="Duration" value={durationValue} />
+        {hasRefills ? <Fact Icon={RefreshCw} label="Refills left" value={String(m.refills)} /> : null}
       </XStack>
 
-      {medicine.instructions ? (
-        <>
-          <Separator borderColor="$borderColor" />
-          <XStack items="flex-start" gap="$2.5">
-            <YStack pt="$0.5">
-              <Info size={16} color="$accent9" />
-            </YStack>
-            <YStack gap="$0.5" flex={1}>
-              <Text fontSize="$1" fontWeight="700" color="$color9" textTransform="uppercase">
-                Note from your doctor
-              </Text>
-              <Text fontSize="$4" color="$color12" lineHeight="$5">
-                {sentence(medicine.instructions)}
-              </Text>
-            </YStack>
-          </XStack>
-        </>
+      {m.instructions ? (
+        <XStack items="flex-start" gap="$2.5" pt="$3" borderTopWidth={1} borderColor="$border">
+          <YStack mt="$0.5">
+            <Info size={16} color="$primary" />
+          </YStack>
+          <YStack gap="$0.5" flex={1}>
+            <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
+              Note from your doctor
+            </Text>
+            <Text fontSize={13.5} color="$color12" lineHeight={20}>
+              {sentence(m.instructions)}
+            </Text>
+          </YStack>
+        </XStack>
       ) : null}
-    </Panel>
+    </DLCard>
   );
 }
 
-/**
- * Lay out a group of medicines. On wide screens we split into two balanced columns
- * (premium, avoids the banned identical-card grid) but keep the group's own order
- * within each column. Mobile is a single stacked list.
- */
-function MedicineGroup({ medicines, wide }: { medicines: Medication[]; wide: boolean }) {
+/** Two balanced columns on web, single stack on mobile. */
+function MedGroup({ meds, wide }: { meds: Medication[]; wide: boolean }) {
   if (!wide) {
     return (
-      <YStack gap="$3.5">
-        {medicines.map((m) => (
-          <MedicineCard key={m.id} medicine={m} />
+      <YStack gap="$3">
+        {meds.map((m) => (
+          <MedicineCard key={m.id} m={m} />
         ))}
       </YStack>
     );
   }
-  const mid = Math.ceil(medicines.length / 2);
-  const cols = [medicines.slice(0, mid), medicines.slice(mid)];
+  const mid = Math.ceil(meds.length / 2);
   return (
-    <XStack gap="$3.5" items="flex-start">
-      {cols.map((col, i) => (
-        <YStack key={i} flex={1} gap="$3.5">
+    <XStack gap="$3" items="flex-start">
+      {[meds.slice(0, mid), meds.slice(mid)].map((col, i) => (
+        <YStack key={i} flex={1} gap="$3">
           {col.map((m) => (
-            <MedicineCard key={m.id} medicine={m} />
+            <MedicineCard key={m.id} m={m} />
           ))}
         </YStack>
       ))}
@@ -240,28 +179,16 @@ function MedicineGroup({ medicines, wide }: { medicines: Medication[]; wide: boo
 
 export default function Meds() {
   const media = useMedia();
-  const { data, isLoading, isError, refetch } =
-    trpc.patientActiveMedications.useQuery();
+  const wide = Boolean(media.md);
+  const { data, isLoading, isError, refetch } = trpc.patientActiveMedications.useQuery();
 
   const meds = data ?? [];
-  // Answer the patient's real question first: what am I taking now?
-  const active = meds
-    .filter((m) => m.active)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const stopped = meds
-    .filter((m) => !m.active)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const active = meds.filter((m) => m.active).sort((a, b) => a.name.localeCompare(b.name));
+  const stopped = meds.filter((m) => !m.active).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <Screen maxWidth={980}>
-      <YStack gap="$1">
-        <Text fontSize="$9" fontWeight="800" color="$color12">
-          Medicines
-        </Text>
-        <Text fontSize="$4" color="$color10">
-          What you are currently taking and how to take it.
-        </Text>
-      </YStack>
+    <DLScreen>
+      <DLTitle title="Medicines" subtitle="What you are taking now and how to take it." />
 
       {isLoading ? (
         <SkeletonList count={3} />
@@ -275,20 +202,17 @@ export default function Meds() {
         <EmptyState
           Icon={Pill}
           title="No active medicines"
-          detail="When your doctor prescribes medicine, it will show here with clear instructions on how to take it."
+          detail="When your doctor prescribes medicine, it appears here with clear instructions on how to take it."
         />
       ) : (
         <YStack gap="$5">
           {active.length > 0 ? (
-            <Section
-              title={
-                active.length === 1
-                  ? "1 active medicine"
-                  : `${active.length} active medicines`
-              }
-            >
-              <MedicineGroup medicines={active} wide={media.md} />
-            </Section>
+            <YStack gap="$3">
+              <Text fontSize={14.5} fontWeight="700" color="$color12" px="$0.5">
+                {active.length === 1 ? "1 active medicine" : `${active.length} active medicines`}
+              </Text>
+              <MedGroup meds={active} wide={wide} />
+            </YStack>
           ) : (
             <EmptyState
               Icon={Pill}
@@ -298,12 +222,15 @@ export default function Meds() {
           )}
 
           {stopped.length > 0 ? (
-            <Section title="Recently stopped">
-              <MedicineGroup medicines={stopped} wide={media.md} />
-            </Section>
+            <YStack gap="$3">
+              <Text fontSize={14.5} fontWeight="700" color="$color12" px="$0.5">
+                Recently stopped
+              </Text>
+              <MedGroup meds={stopped} wide={wide} />
+            </YStack>
           ) : null}
         </YStack>
       )}
-    </Screen>
+    </DLScreen>
   );
 }

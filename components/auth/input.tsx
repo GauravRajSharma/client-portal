@@ -144,7 +144,7 @@ const InputImpl = InputFrame.styleable((props, ref) => {
           setFocused(true);
         }}
         onBlur={() => setFocused(false)}
-        size={size}
+        size={size as any}
         {...rest}
       />
     </View>

@@ -343,25 +343,37 @@ export function paymentStateLabel(state: unknown): string {
  * Map one Odoo invoice (+ its lines) to a Bill DTO. Tolerant of `false`-empties
  * and missing lines; never throws on shape drift.
  */
+const CARE_TYPE: Record<string, "Outpatient" | "Inpatient"> = {
+  O: "Outpatient",
+  I: "Inpatient",
+};
+
 export function toBill(
   invoiceRaw: any,
   lineRaws: any[] | undefined,
-  opts: { nhisNumber?: string; visitId?: string } = {},
+  opts: { nhisNumber?: string; visitId?: string; orderedBy?: string } = {},
 ): Bill {
   const total = money(invoiceRaw?.amount_total);
   const due = money(invoiceRaw?.amount_residual);
   const paid = Math.max(0, total - due);
   const lines = Array.isArray(lineRaws) ? lineRaws.map(toBillLine) : [];
+  const kind = str(invoiceRaw?.move_type) === "out_refund" ? "refund" : "invoice";
+  const claimCode = str(invoiceRaw?.claim_code);
   return {
     id: str(invoiceRaw?.id) ?? str(invoiceRaw?.name),
     visitId: opts.visitId ?? str(invoiceRaw?.name),
+    kind,
     number: str(invoiceRaw?.name),
     date: str(invoiceRaw?.invoice_date) ?? str(invoiceRaw?.date),
+    careType: CARE_TYPE[String(invoiceRaw?.care_type)],
+    claimCode,
+    orderedBy: opts.orderedBy,
     paymentStatus: paymentStateLabel(invoiceRaw?.payment_state),
     currency: str(invoiceRaw?.currency_id?.[1]) === "USD" ? "USD" : "NPR",
     total,
     paid,
     due,
+    // A refund returns money to the patient, so it never adds to what they owe.
     lines,
     insurance: toInsuranceCoverage(invoiceRaw, {
       nhisNumber: opts.nhisNumber,

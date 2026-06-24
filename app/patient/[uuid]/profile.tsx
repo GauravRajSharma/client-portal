@@ -3,18 +3,27 @@ import {
   ErrorState,
   LanguageToggle,
   Panel,
+  PiiValue,
+  PrivacyToggle,
   Screen,
   Section,
   Skeleton,
 } from "@/components/ui";
+import type { PiiKind } from "@/utils/privacy";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  Building2,
+  ChevronRight,
+  FileText,
+  FlaskConical,
   Hospital as HospitalIcon,
   IdCard,
   LogOut,
   Phone,
+  Receipt,
+  Scan,
   ShieldCheck,
   ShieldHalf,
 } from "@tamagui/lucide-icons";
@@ -39,11 +48,13 @@ function DetailRow({
   label,
   value,
   placeholder,
+  pii,
 }: {
   Icon: NamedExoticComponent<any>;
   label: string;
   value?: string;
   placeholder: string;
+  pii?: PiiKind;
 }) {
   const has = !!value && value.trim().length > 0;
   return (
@@ -55,14 +66,18 @@ function DetailRow({
         <Text fontSize="$2" color="$color9" fontWeight="600">
           {label}
         </Text>
-        <Text
-          fontSize="$5"
-          fontWeight={has ? "700" : "500"}
-          color={has ? "$color12" : "$color9"}
-          fontVariant={["tabular-nums"]}
-        >
-          {has ? value : placeholder}
-        </Text>
+        {pii && has ? (
+          <PiiValue value={value} kind={pii} fontSize={17} fontWeight="700" />
+        ) : (
+          <Text
+            fontSize="$5"
+            fontWeight={has ? "700" : "500"}
+            color={has ? "$color12" : "$color9"}
+            fontVariant={["tabular-nums"]}
+          >
+            {has ? value : placeholder}
+          </Text>
+        )}
       </YStack>
     </XStack>
   );
@@ -215,15 +230,7 @@ export default function Profile() {
           </Text>
           <XStack gap="$1.5" items="center">
             <IdCard size={14} color="$color9" />
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              color="$color10"
-              fontVariant={["tabular-nums"]}
-              numberOfLines={1}
-            >
-              {data.mrn || placeholder}
-            </Text>
+            <PiiValue value={data.mrn} kind="mrn" fontSize={13} fontWeight="600" color="$color10" />
           </XStack>
           {data.hospital?.name ? (
             <XStack gap="$1.5" items="center">
@@ -265,6 +272,7 @@ export default function Profile() {
           label={T("profile.field.insurance")}
           value={data.insuranceNumber}
           placeholder={placeholder}
+          pii="id"
         />
         <Separator borderColor="$borderColor" />
         <DetailRow
@@ -272,6 +280,7 @@ export default function Profile() {
           label={T("profile.field.phone")}
           value={data.phone}
           placeholder={placeholder}
+          pii="phone"
         />
       </Panel>
     </Section>
@@ -283,7 +292,10 @@ export default function Profile() {
         <Text fontSize="$8" fontWeight="800" color="$color12">
           {T("profile.title")}
         </Text>
-        <LanguageToggle />
+        <XStack items="center" gap="$2">
+          <PrivacyToggle />
+          <LanguageToggle />
+        </XStack>
       </XStack>
 
       {media.md ? (
@@ -297,6 +309,38 @@ export default function Profile() {
           {details}
         </YStack>
       )}
+
+      <Section title="More">
+        <Panel p="$0" gap="$0">
+          {[
+            { Icon: Receipt, label: "Billing & insurance", to: "billing" },
+            { Icon: Scan, label: "Imaging", to: "imaging" },
+            { Icon: FileText, label: "Documents", to: "documents" },
+            { Icon: FlaskConical, label: "Book a test", to: "book" },
+            { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },
+          ].map((item, i) => (
+            <XStack
+              key={item.to}
+              items="center"
+              gap="$3"
+              px="$4"
+              py="$3.5"
+              borderTopWidth={i > 0 ? 1 : 0}
+              borderColor="$border"
+              onPress={() => router.push(`/patient/${data.id}/${item.to}` as any)}
+              pressStyle={{ opacity: 0.6 }}
+            >
+              <YStack width={38} height={38} rounded={10} bg="$primarySoft" items="center" justify="center">
+                <item.Icon size={18} color="$primary" />
+              </YStack>
+              <Text flex={1} fontSize="$4" fontWeight="600" color="$color12">
+                {item.label}
+              </Text>
+              <ChevronRight size={18} color="$text3" />
+            </XStack>
+          ))}
+        </Panel>
+      </Section>
 
       <Separator borderColor="$borderColor" my="$2" />
       <SignOutButton />
