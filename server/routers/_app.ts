@@ -682,14 +682,17 @@ export const appRouter = router({
             invoices.map(async (inv) => {
                 let lines: any[] = [];
                 try {
+                    // Odoo 16: real charge rows carry display_type="product".
+                    // (section/note/tax/payment_term rows are not itemized charges, and
+                    // the old `exclude_from_invoice_tab` field no longer exists — querying
+                    // it threw and silently emptied every bill.)
                     lines = await ctx.clients.OdooAPI.rpc<any[]>({
                         model: "account.move.line",
                         method: "search_read",
                         args: [
                             [
                                 ["move_id", "=", inv.id],
-                                ["display_type", "=", false],
-                                ["exclude_from_invoice_tab", "=", false],
+                                ["display_type", "=", "product"],
                             ],
                         ],
                         kwargs: {
