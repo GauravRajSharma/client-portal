@@ -183,6 +183,17 @@ export interface PatientOverview {
   };
 }
 
+/** A recorded allergy / intolerance (OpenMRS FHIR AllergyIntolerance). */
+export interface Allergy {
+  id: string;
+  substance: string;
+  /** FHIR criticality: low | high | unable-to-assess */
+  criticality?: string;
+  /** allergy categories, e.g. medication / food / environment */
+  categories: string[];
+  reactions: string[];
+}
+
 export type ImagingModality =
   | "usg"
   | "xray"

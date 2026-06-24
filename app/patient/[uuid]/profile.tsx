@@ -313,6 +313,7 @@ export default function Profile() {
       <Section title="More">
         <Panel p="$0" gap="$0">
           {[
+            { Icon: ShieldCheck, label: "Health passport", to: "passport" },
             { Icon: Receipt, label: "Billing & insurance", to: "billing" },
             { Icon: Scan, label: "Imaging", to: "imaging" },
             { Icon: FileText, label: "Documents", to: "documents" },

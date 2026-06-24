@@ -9,6 +9,7 @@ import {
   Pill,
   Receipt,
   Scan,
+  ShieldAlert,
   Stethoscope,
   TriangleAlert,
 } from "@tamagui/lucide-icons";
@@ -77,6 +78,7 @@ export default function Home() {
   const patientQ = trpc.patient.useQuery();
   const labsQ = trpc.patientAllLabResults.useQuery();
   const careQ = trpc.patientCareStatus.useQuery();
+  const allergyQ = trpc.patientAllergies.useQuery();
   const revealAll = usePrivacy((s) => s.revealAll);
 
   if (patientQ.isError || labsQ.isError) {
@@ -139,6 +141,16 @@ export default function Home() {
           Hello, {(patient?.name ?? "there").split(" ")[0]}
         </Text>
       </YStack>
+
+      {allergyQ.data && allergyQ.data.length > 0 ? (
+        <AlertBanner
+          Icon={ShieldAlert}
+          title={`Allergy alert: ${allergyQ.data.map((a) => a.substance).slice(0, 3).join(", ")}`}
+          detail="Make sure your care team knows."
+          onPress={() => go("passport")}
+          Chevron={ChevronRight}
+        />
+      ) : null}
 
       {careQ.data?.active ? (
         <CareCard care={careQ.data} onPress={() => go("care")} />

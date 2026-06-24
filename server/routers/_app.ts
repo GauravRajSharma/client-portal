@@ -14,6 +14,7 @@ import {
     signImage,
 } from "../lib/pacs";
 import type {
+    Allergy,
     Bill,
     CareStatus,
     ImagingStudy,
@@ -72,20 +73,27 @@ const customFields = {
   `,
 };
 
+// MRN prefix -> netbird host. Authoritative list (incl. sites added at the end).
 const hospitals = [
-    { prefix: "GPKH", server: "gpkm" },
-    { prefix: "GLDH", server: "gulmi" },
+    { prefix: "MBDH", server: "mbdh" },
     { prefix: "MSMH", server: "msmh" },
-    { prefix: "BJDH", server: "bajh" },
-    { prefix: "ICDH", server: "icdhup" },
-    { prefix: "OKDH", server: "okdh" },
-    { prefix: "KAHS", server: "kahs" },
-    { prefix: "SOLU", server: "solu" },
-    { prefix: "MBDH", server: "mbdh-cloud" },
-    { prefix: "ABHU", server: "abhu" },
-    { prefix: "RUPA", server: "rupa" },
     { prefix: "DGPH", server: "dlph" },
+    { prefix: "PHDT", server: "damu" },
+    { prefix: "GRKH", server: "grkh" },
+    { prefix: "SNDH", server: "sndh" },
+    { prefix: "GPKM", server: "gpkm" },
+    { prefix: "DHAD", server: "dhad" },
     { prefix: "LAMJ", server: "lamj" },
+    { prefix: "ABHU", server: "abhu" },
+    { prefix: "GLDH", server: "gldh" },
+    { prefix: "GMH", server: "gmh" },
+    { prefix: "KAHS", server: "kahs" },
+    { prefix: "OKDH", server: "okdh" },
+    { prefix: "ICDH", server: "icdhup" },
+    { prefix: "RUPA", server: "rupa" },
+    { prefix: "SOLU", server: "solu" },
+    { prefix: "BAJH", server: "bajh" },
+    { prefix: "APF", server: "apf" },
 ];
 
 import { JWT_SECRET } from "../config/env";
@@ -246,10 +254,9 @@ export const appRouter = router({
             let { mrn, server } = opts.input;
 
             if (server === "") {
-                const prefix = mrn.slice(0, 4).toUpperCase();
-                console.log({ prefix });
-                server =
-                    hospitals.find((h) => h.prefix === prefix)?.server ?? "";
+                // Match by prefix the MRN starts with (handles 3- and 4-char prefixes).
+                const up = mrn.toUpperCase();
+                server = hospitals.find((h) => up.startsWith(h.prefix))?.server ?? "";
             }
 
             const hospital = hospitals.find((h) => h.server === server);
@@ -777,6 +784,30 @@ export const appRouter = router({
             };
         } catch {
             return base;
+        }
+    }),
+
+    /**
+     * patientAllergies — read-only allergies/intolerances from OpenMRS FHIR
+     * (AllergyIntolerance). Empty list is a valid, meaningful answer ("none recorded").
+     */
+    patientAllergies: protectedProcedure.query(async ({ ctx }): Promise<Allergy[]> => {
+        try {
+            const bundle = await ctx.clients.OpenmrsFHIRAPI<any>("AllergyIntolerance", {
+                query: { patient: ctx.auth.uuid },
+            });
+            const entries = (bundle?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            return entries.map((r: any): Allergy => ({
+                id: String(r.id ?? ""),
+                substance: r.code?.text ?? r.code?.coding?.[0]?.display ?? "Unknown",
+                criticality: r.criticality,
+                categories: Array.isArray(r.category) ? r.category : [],
+                reactions: (r.reaction ?? []).flatMap((rx: any) =>
+                    (rx.manifestation ?? []).map((m: any) => m.text ?? m.coding?.[0]?.display).filter(Boolean),
+                ),
+            }));
+        } catch {
+            return [];
         }
     }),
 
