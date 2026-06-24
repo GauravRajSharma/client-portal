@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import type { PiiKind } from "@/utils/privacy";
 import { SecuritySettings } from "@/components/security-settings";
+import { authClient } from "@/utils/authClient";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -37,7 +38,6 @@ import {
   Paragraph,
   Separator,
   Text,
-  Theme,
   XStack,
   YStack,
   useMedia,
@@ -90,7 +90,11 @@ function SignOutButton() {
   const queryClient = useQueryClient();
 
   const signOut = async () => {
-    // Local-only: clears the stored token + cached reads. NOT a backend mutation.
+    // End the app-account session too — clearing only the hospital token left the
+    // Better Auth session alive, so the index guard bounced the user back in.
+    try {
+      await authClient.signOut();
+    } catch {}
     await AsyncStorage.removeItem("access:token");
     queryClient.clear();
     router.replace("/auth/login");
@@ -144,12 +148,12 @@ function SignOutButton() {
                 {T("profile.signOut.cancel")}
               </Button>
             </AlertDialog.Cancel>
-            <AlertDialog.Action asChild onPress={signOut}>
-              <Theme name="error">
-                <Button size="$3" icon={LogOut}>
-                  {T("profile.signOut")}
-                </Button>
-              </Theme>
+            <AlertDialog.Action asChild>
+              {/* onPress + theme must be on the Button itself: with a <Theme> wrapper in
+                  between, asChild forwarded the press to <Theme> and sign-out never fired. */}
+              <Button size="$3" icon={LogOut} theme="error" onPress={signOut}>
+                {T("profile.signOut")}
+              </Button>
             </AlertDialog.Action>
           </XStack>
         </AlertDialog.Content>
