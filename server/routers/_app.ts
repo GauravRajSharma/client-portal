@@ -15,6 +15,7 @@ import {
 } from "../lib/pacs";
 import type {
     Bill,
+    CareStatus,
     ImagingStudy,
     LabResult,
     Medication,
@@ -703,6 +704,81 @@ export const appRouter = router({
      * invoice (account.move) for this patient, with itemized lines (account.move.line)
      * and a coverage block. Identity from the token; calls ONLY search_read.
      */
+    /**
+     * patientCareStatus — read-only "care in progress" snapshot for the patient's own
+     * open visit (Odoo), enriched with the bridge throughput model (current stage,
+     * journey steps, pending services, in-hospital signal). No open visit -> inactive.
+     */
+    patientCareStatus: protectedProcedure.query(async ({ ctx }): Promise<CareStatus> => {
+        const inactive: CareStatus = {
+            active: false,
+            steps: [],
+            pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
+        };
+        let open: any;
+        try {
+            const visits = await ctx.clients.OdooAPI.rpc<any[]>({
+                model: "patient.visit",
+                method: "search_read",
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: ["external_uuid", "visit_status", "manual_close_visit", "department", "visit_type", "create_date"],
+                    order: "create_date desc",
+                    limit: 5,
+                },
+            });
+            open = (visits ?? []).find(
+                (v) =>
+                    v.visit_status === "open" ||
+                    v.visit_status === "requested-close" ||
+                    v.manual_close_visit === false,
+            );
+        } catch {
+            return inactive;
+        }
+        if (!open?.external_uuid) return inactive;
+
+        const base: CareStatus = {
+            active: true,
+            visitId: String(open.external_uuid),
+            workflow: String(open.visit_type ?? "").toLowerCase() || undefined,
+            department: open.department || undefined,
+            since: open.create_date ? String(open.create_date).replace(" ", "T") : undefined,
+            steps: [],
+            pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
+        };
+
+        try {
+            const tp = await ctx.clients.BridgeApi<any>(`/views/throughput/visit/${open.external_uuid}`);
+            const band = tp?.exitProbability?.band as string | undefined;
+            const left = band === "likely_left" || band === "very_likely_left";
+            const svc = tp?.metrics?.services ?? {};
+            const flow = Array.isArray(tp?.currentMoment?.normalFlow) ? tp.currentMoment.normalFlow : [];
+            return {
+                ...base,
+                // An open-but-already-left visit isn't "in progress" for the patient.
+                active: !left,
+                inHospital: !left,
+                durationHours: tp?.visit?.duration?.durationHours,
+                stage: tp?.currentMoment?.label,
+                stageDetail: tp?.currentMoment?.rationale,
+                steps: flow.map((st: any) => ({
+                    key: st.key,
+                    label: friendlyStep(st.key, st.label),
+                    status: st.status,
+                })),
+                pending: {
+                    lab: svc.lab?.pending ?? 0,
+                    radiology: svc.radiology?.pending ?? 0,
+                    procedure: svc.procedure?.pending ?? 0,
+                    medication: svc.medication?.pending ?? 0,
+                },
+            };
+        } catch {
+            return base;
+        }
+    }),
+
     patientBills: protectedProcedure.query(async ({ ctx }): Promise<Bill[]> => {
         let nhisNumber: string | undefined;
         try {
@@ -917,6 +993,20 @@ async function fetchRawVisits(
             ...(externalUuid ? { limit: 1 } : {}),
         },
     });
+}
+
+/** Patient-friendly labels for the care-journey steps from the bridge throughput model. */
+const STEP_LABELS: Record<string, string> = {
+    ticket: "Registered",
+    doctor_assessment: "Seen by doctor",
+    investigations_ordered: "Tests ordered",
+    investigations_fulfilled: "Results",
+    doctor_review_prescription: "Prescription",
+    pharmacy: "Pharmacy",
+    exit: "Discharge",
+};
+function friendlyStep(key: string, fallback?: string): string {
+    return STEP_LABELS[key] ?? fallback ?? key;
 }
 
 /** Plain-language label for an OpenMRS order fulfillerStatus. */

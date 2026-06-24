@@ -8,3 +8,4 @@ export { LineChart } from "./LineChart";
 export type { ChartPoint } from "./LineChart";
 export * from "./dl";
 export * from "./Pii";
+export * from "./care";

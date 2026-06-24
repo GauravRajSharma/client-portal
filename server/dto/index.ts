@@ -221,6 +221,39 @@ export interface ImagingStudy {
   images: ImagingImage[];
 }
 
+/** One step in the live "care in progress" journey. */
+export interface CareStep {
+  key: string;
+  label: string;
+  status: "completed" | "current" | "pending";
+}
+
+/**
+ * CareStatus — a read-only "where am I in my hospital visit right now" snapshot, like a
+ * ride-share active-trip panel. Derived from the patient's own open visit (Odoo) enriched
+ * with the bridge throughput model. Absent/closed visit -> { active: false }.
+ */
+export interface CareStatus {
+  active: boolean;
+  visitId?: string;
+  /** opd | ipd | er | general */
+  workflow?: string;
+  department?: string;
+  /** ISO start of the visit */
+  since?: string;
+  durationHours?: number;
+  /** true while the model still believes the patient is physically in the hospital */
+  inHospital?: boolean;
+  /** current stage label, e.g. "Waiting for investigation fulfillment" */
+  stage?: string;
+  /** one-line plain explanation of the current stage */
+  stageDetail?: string;
+  /** ordered journey steps (completed / current / pending) */
+  steps: CareStep[];
+  /** how many items are still pending, by service */
+  pending: { lab: number; radiology: number; procedure: number; medication: number };
+}
+
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";
 
 export interface PatientDocument {
