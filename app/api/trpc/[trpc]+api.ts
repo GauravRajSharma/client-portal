@@ -7,7 +7,13 @@ export async function GET(req: Request) {
     req,
     router: appRouter,
     createContext: ({ req }) => {
-      return { token: req.headers.get("Authorization") };
+      return {
+        token: req.headers.get("Authorization"),
+        ip:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          "anon",
+      };
     },
   });
 }
@@ -19,7 +25,13 @@ export async function POST(req: Request) {
     router: appRouter,
 
     createContext: ({ req }) => {
-      return { token: req.headers.get("Authorization") };
+      return {
+        token: req.headers.get("Authorization"),
+        ip:
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          req.headers.get("x-real-ip") ||
+          "anon",
+      };
     },
   });
 }

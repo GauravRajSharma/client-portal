@@ -10,6 +10,28 @@
 
 export type VisitType = "OPD" | "IPD" | "ER" | "OTHER";
 
+/* ---- Public (pre-login) search DTOs ---- */
+
+/** A doctor as shown publicly: name, NMC/license, title, and which hospitals. No PII. */
+export interface PublicDoctor {
+  name: string;
+  license?: string;
+  title?: string;
+  /** hospital codes/prefixes where this doctor practises */
+  hospitals: string[];
+}
+
+/** Per-hospital bed availability (counts only — never any patient information). */
+export interface BedAvailability {
+  /** hospital code/prefix */
+  hospital: string;
+  hospitalName?: string;
+  total: number;
+  occupied: number;
+  free: number;
+  types: { type: string; total: number; occupied: number; free: number }[];
+}
+
 export type LabStatus =
   | "normal"
   | "low"
