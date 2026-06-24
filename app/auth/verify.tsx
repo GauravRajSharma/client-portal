@@ -25,10 +25,12 @@ export default function VerificationPage() {
     token: string;
     field: string;
     value: string;
+    claim?: string;
   }>();
   const token = params.token;
   const field = params.field;
   const value = params.value;
+  const isClaim = params.claim === "1";
 
   const isPhone = value === "mobile";
   // Recognition, not a secret: the patient is confirming their OWN number, so show it
@@ -45,6 +47,7 @@ export default function VerificationPage() {
   });
 
   const { mutateAsync: verify, isPending, error } = trpc.verify.useMutation();
+  const { mutateAsync: linkHospital } = trpc.linkHospital.useMutation();
 
   if (!token || !field || !value) return <Redirect href="/" />;
 
@@ -55,8 +58,14 @@ export default function VerificationPage() {
     try {
       const response = await verify({ token, value: data?.[fieldName] });
       if (response) {
-        await AsyncStorage.setItem("access:token", response.accessToken);
-        router.replace(`/patient/${response.uuid}/visits`);
+        if (isClaim) {
+          // Claiming into an app account: link this record, return to the picker.
+          await linkHospital({ accessToken: response.accessToken });
+          router.replace("/auth/hospitals" as any);
+        } else {
+          await AsyncStorage.setItem("access:token", response.accessToken);
+          router.replace(`/patient/${response.uuid}/home` as any);
+        }
       }
     } catch {
       // surfaced via `error` below

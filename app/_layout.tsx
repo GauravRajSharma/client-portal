@@ -30,6 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
 import { asyncStoragePersister } from "@/utils/mmkv";
 import { usePrivacy } from "@/utils/privacy";
+import { authClient } from "@/utils/authClient";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -67,10 +68,16 @@ const trpcClient = trpc.createClient({
       // You can pass any HTTP headers you wish here
       async headers() {
         const token = await AsyncStorage.getItem("access:token");
-
-        return {
-          authorization: token ?? "no-token",
-        };
+        const h: Record<string, string> = { authorization: token ?? "no-token" };
+        // Web sends the Better Auth session cookie automatically (same-origin).
+        // Native has no cookie jar, so attach it from the Expo auth client.
+        if (Platform.OS !== "web") {
+          try {
+            const cookie = authClient.getCookie();
+            if (cookie) h.Cookie = cookie;
+          } catch {}
+        }
+        return h;
       },
     }),
   ],

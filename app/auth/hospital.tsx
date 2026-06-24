@@ -1,5 +1,5 @@
 import React from "react";
-import { router } from "expo-router";
+import { router, useGlobalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { ArrowLeft, CheckCircle, CreditCard, ShieldCheck } from "@tamagui/lucide-icons";
 import { Button, Text, XStack, YStack } from "tamagui";
@@ -21,6 +21,9 @@ type SignInForm = { mrn: string; server: string };
 
 /** The working sign-in: hospital + MRN (+ scan), routed to 2FA verify. Its own page. */
 export default function HospitalSignIn() {
+  // When launched from the app-account "Add hospital" flow, carry the claim flag to verify.
+  const { claim } = useGlobalSearchParams<{ claim?: string }>();
+
   const {
     control,
     handleSubmit,
@@ -54,6 +57,7 @@ export default function HospitalSignIn() {
           token: response.cookie,
           field: response.verification.field.label,
           value: response.verification.field.value,
+          ...(claim === "1" ? { claim: "1" } : {}),
         }).toString();
         router.push(`/auth/verify?${q}`);
       }
