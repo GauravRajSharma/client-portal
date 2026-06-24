@@ -5,6 +5,7 @@
  */
 import type { ReactNode } from "react";
 import type { NamedExoticComponent } from "react";
+import { ArrowLeft, ChevronRight } from "@tamagui/lucide-icons";
 import { ScrollView, Text, XStack, YStack, styled } from "tamagui";
 import type { LabResult, LabStatus } from "@/server/dto";
 
@@ -463,6 +464,101 @@ export function DeptChips({
       </XStack>
     </ScrollView>
   );
+}
+
+/** Quiet back affordance used on every detail screen. */
+export function DLBack({ label = "Back", onPress }: { label?: string; onPress: () => void }) {
+  return (
+    <XStack items="center" gap="$2" self="flex-start" py="$1.5" pr="$3" onPress={onPress} pressStyle={{ opacity: 0.6 }}>
+      <ArrowLeft size={18} color="$text2" />
+      <Text fontSize={14} fontWeight="500" color="$text2">
+        {label}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Page title block: title + optional subtitle, with an optional right-aligned action. */
+export function DLTitle({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <XStack items="flex-start" justify="space-between" gap="$3" px="$0.5">
+      <YStack flex={1} gap="$1">
+        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text fontSize={13} color="$text2">
+            {subtitle}
+          </Text>
+        ) : null}
+      </YStack>
+      {action}
+    </XStack>
+  );
+}
+
+/**
+ * Tappable navigation row: soft icon chip, title (+ optional detail), chevron.
+ * Used for record shortcuts (Home grid, Profile "More", visit sub-screens).
+ */
+export function DLNavRow({
+  Icon,
+  title,
+  detail,
+  onPress,
+  border = false,
+  tint = "$primary",
+  tintSoft = "$primarySoft",
+}: {
+  Icon: NamedExoticComponent<any>;
+  title: string;
+  detail?: string;
+  onPress: () => void;
+  border?: boolean;
+  tint?: any;
+  tintSoft?: any;
+}) {
+  return (
+    <XStack
+      items="center"
+      gap="$3"
+      px="$3.5"
+      py="$3.5"
+      borderTopWidth={border ? 1 : 0}
+      borderColor="$border"
+      onPress={onPress}
+      pressStyle={{ opacity: 0.6 }}
+    >
+      <YStack width={38} height={38} rounded={10} bg={tintSoft} items="center" justify="center">
+        <Icon size={18} color={tint} />
+      </YStack>
+      <YStack flex={1} minW={0}>
+        <Text fontSize={14.5} fontWeight="600" color="$color12" numberOfLines={1}>
+          {title}
+        </Text>
+        {detail ? (
+          <Text fontSize={12} color="$text2" mt="$0.5" numberOfLines={1}>
+            {detail}
+          </Text>
+        ) : null}
+      </YStack>
+      <ChevronRight size={18} color="$text3" />
+    </XStack>
+  );
+}
+
+/** Format a money amount the Nepali way (grouped), prefixed with its currency. */
+export function dlMoney(amount: number | undefined, currency = "NPR"): string {
+  if (amount == null || Number.isNaN(amount)) return "—";
+  return `${currency} ${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 }
 
 /** AlphaGate: a centered lock card for features not yet available in alpha. */

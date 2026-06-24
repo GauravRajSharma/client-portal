@@ -3,8 +3,12 @@ import {
   Activity,
   ChevronRight,
   Droplet,
+  FileText,
   FlaskConical,
   HeartPulse,
+  Pill,
+  Receipt,
+  Stethoscope,
   TriangleAlert,
 } from "@tamagui/lucide-icons";
 import { Text, XStack, YStack } from "tamagui";
@@ -13,6 +17,7 @@ import type { LabResult } from "@/server/dto";
 import {
   AlertBanner,
   DLCard,
+  DLNavRow,
   DLScreen,
   ErrorState,
   LineChart,
@@ -23,6 +28,13 @@ import {
   SummaryChips,
   dlStatus,
 } from "@/components/ui";
+
+const RECORD_LINKS = [
+  { Icon: Stethoscope, title: "Visits", detail: "Appointments and admissions", seg: "visits" },
+  { Icon: Pill, title: "Medicines", detail: "What you are taking now", seg: "meds" },
+  { Icon: Receipt, title: "Billing", detail: "Charges and insurance", seg: "billing" },
+  { Icon: FileText, title: "Documents", detail: "Summaries and reports", seg: "documents" },
+];
 
 const TILE_ICONS = [Droplet, Activity, FlaskConical, HeartPulse];
 
@@ -145,6 +157,22 @@ export default function Home() {
           sub={[patient.mrn, patient.hospital?.name].filter(Boolean).join(" · ")}
         />
       ) : null}
+
+      <DLCard overflow="hidden">
+        <Text fontSize={15} fontWeight="700" color="$color12" px="$3.5" pt="$3.5" pb="$1">
+          Your records
+        </Text>
+        {RECORD_LINKS.map((l, i) => (
+          <DLNavRow
+            key={l.seg}
+            Icon={l.Icon}
+            title={l.title}
+            detail={l.detail}
+            onPress={() => go(l.seg)}
+            border={i > 0}
+          />
+        ))}
+      </DLCard>
 
       {tiles.length > 0 ? (
         <YStack gap="$2.5">

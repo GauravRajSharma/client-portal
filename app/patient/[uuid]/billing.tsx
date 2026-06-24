@@ -1,70 +1,46 @@
+import { useMemo } from "react";
+import { Info, Receipt, ShieldCheck } from "@tamagui/lucide-icons";
+import { Text, XStack, YStack, useMedia } from "tamagui";
+import type { Bill, BillLine } from "@/server/dto";
 import {
-  DateText,
+  DLCard,
+  DLScreen,
+  DLStatusPill,
+  DLTitle,
   EmptyState,
   ErrorState,
-  Money,
-  Panel,
-  Screen,
-  Section,
   SkeletonList,
-  StatusPill,
+  dlMoney,
 } from "@/components/ui";
-import type { Bill, BillLine } from "@/server/dto";
 import { trpc } from "@/utils/trpc";
-import { Info, Receipt, ShieldCheck } from "@tamagui/lucide-icons";
-import { useMemo } from "react";
-import { Paragraph, Text, Theme, XStack, YStack, useMedia } from "tamagui";
 
-/* ---------------------------------------------------------------------------
- * Billing & insurance — read-only.
- *
- * Answers, in order of what a patient actually asks:
- *   1. "What do I owe right now?"  -> outstanding balance, up top, large.
- *   2. "What was I charged for?"   -> itemized lines per bill.
- *   3. "What did my insurance cover?" -> a plain-language coverage block.
- *
- * Everything here is a view. Nothing on this screen can change money.
- * ------------------------------------------------------------------------- */
+/* Billing & insurance — strictly read-only. Answers, in order:
+ *   1. What do I owe right now?  2. What was I charged for?  3. What did insurance cover? */
 
-const CURRENCY = "NPR";
+const CCY = "NPR";
 
-/** Map a bill's settlement to a calm status pill theme + label. */
-function billStatus(bill: Bill): {
-  label: string;
-  theme: "success" | "warning" | "neutral";
-} {
-  if (bill.due <= 0 && bill.total > 0)
-    return { label: "Settled", theme: "success" };
-  if (bill.due > 0 && bill.paid > 0)
-    return { label: "Partly paid", theme: "warning" };
-  if (bill.due > 0) return { label: "Due", theme: "warning" };
-  return { label: bill.paymentStatus ?? "—", theme: "neutral" };
+function billStatus(b: Bill): { label: string; color: any; soft: any } {
+  if (b.due <= 0 && b.total > 0) return { label: "Settled", color: "$good", soft: "$goodSoft" };
+  if (b.due > 0 && b.paid > 0) return { label: "Partly paid", color: "$warn", soft: "$warnSoft" };
+  if (b.due > 0) return { label: "Due", color: "$warn", soft: "$warnSoft" };
+  return { label: b.paymentStatus ?? "—", color: "$text3", soft: "$surface3" };
 }
 
-/** A faint, informational banner clarifying this screen is view-only. */
-function ViewOnlyNote() {
+/** Odoo amount is tax-inclusive while unitPrice is pre-tax, so only show the
+ *  "qty × unit" hint when it genuinely reconciles (within rounding). */
+function reconciles(line: BillLine): boolean {
+  if (line.quantity === undefined || line.unitPrice === undefined) return false;
+  return Math.abs(line.quantity * line.unitPrice - line.amount) < 0.5;
+}
+
+function Money({ amount, size = 14, weight = "700", color = "$color12" }: { amount?: number; size?: number; weight?: any; color?: any }) {
   return (
-    <XStack
-      items="center"
-      gap="$2.5"
-      px="$3.5"
-      py="$2.5"
-      rounded="$6"
-      bg="$color2"
-      borderColor="$borderColor"
-      borderWidth={1}
-    >
-      <Info size={16} color="$color10" />
-      <Paragraph flex={1} fontSize="$2" color="$color10" lineHeight="$1">
-        This is an informational view of your charges and insurance. It is read
-        only. To pay or to ask about a charge, please contact the hospital
-        billing desk.
-      </Paragraph>
-    </XStack>
+    <Text fontSize={size} fontWeight={weight} fontFamily="$mono" color={color} letterSpacing={-0.3}>
+      {dlMoney(amount, CCY)}
+    </Text>
   );
 }
 
-/** The headline: total outstanding across all bills. The first thing seen. */
 function OutstandingHeader({ bills }: { bills: Bill[] }) {
   const totals = useMemo(() => {
     let due = 0;
@@ -75,336 +51,179 @@ function OutstandingHeader({ bills }: { bills: Bill[] }) {
       billed += b.total;
       paid += b.paid;
     }
-    return { due, billed, paid };
+    return { due: Math.max(0, due), billed, paid };
   }, [bills]);
-
   const settled = totals.due <= 0;
 
   return (
-    <Panel gap="$3">
-      <XStack items="center" justify="space-between" gap="$3" flexWrap="wrap">
+    <DLCard p="$4" gap="$3.5">
+      <XStack items="flex-start" justify="space-between" gap="$3">
         <YStack gap="$1.5">
-          <Text fontSize="$3" fontWeight="600" color="$color10">
+          <Text fontSize={12.5} fontWeight="600" color="$text2">
             Outstanding balance
           </Text>
-          <Theme name={settled ? "success" : "warning"}>
-            <Money
-              amount={Math.max(0, totals.due)}
-              currency={CURRENCY}
-              size="$10"
-              weight="800"
-              color="$color12"
-            />
-          </Theme>
+          <Text fontSize={36} fontWeight="700" fontFamily="$mono" color={settled ? "$good" : "$color12"} letterSpacing={-1.5}>
+            {dlMoney(totals.due, CCY)}
+          </Text>
         </YStack>
         {settled ? (
-          <StatusPill label="All settled" theme="success" Icon={ShieldCheck} />
+          <DLStatusPill label="All settled" color="$good" soft="$goodSoft" />
         ) : (
-          <StatusPill label="Payment due" theme="warning" />
+          <DLStatusPill label="Payment due" color="$warn" soft="$warnSoft" />
         )}
       </XStack>
-
-      <XStack
-        borderTopWidth={1}
-        borderColor="$borderColor"
-        pt="$3"
-        gap="$6"
-        flexWrap="wrap"
-      >
+      <XStack gap="$6" pt="$3" borderTopWidth={1} borderColor="$border" flexWrap="wrap">
         <YStack gap="$1">
-          <Text fontSize="$2" color="$color9">
+          <Text fontSize={11.5} color="$text2">
             Total billed
           </Text>
-          <Money
-            amount={totals.billed}
-            currency={CURRENCY}
-            size="$5"
-            weight="700"
-            color="$color11"
-          />
+          <Money amount={totals.billed} size={15} color="$color11" />
         </YStack>
         <YStack gap="$1">
-          <Text fontSize="$2" color="$color9">
+          <Text fontSize={11.5} color="$text2">
             Paid or covered
           </Text>
-          <Money
-            amount={totals.paid}
-            currency={CURRENCY}
-            size="$5"
-            weight="700"
-            color="$color11"
-          />
+          <Money amount={totals.paid} size={15} color="$color11" />
         </YStack>
       </XStack>
-    </Panel>
+    </DLCard>
   );
 }
 
-/**
- * Does "qty × unitPrice" actually reconcile to the line amount? Odoo's amount is
- * tax-inclusive while unitPrice is pre-tax, so the two often differ. We only show
- * the multiplication hint when it genuinely adds up (within rounding); otherwise
- * showing "2 × 500 = 1130" would read as a mistake and erode trust.
- */
-function reconciles(line: BillLine): boolean {
-  if (line.quantity === undefined || line.unitPrice === undefined) return false;
-  return Math.abs(line.quantity * line.unitPrice - line.amount) < 0.5;
-}
-
-/** One itemized charge line. Web shows a table-aligned row; mobile stacks. */
 function LineRow({ line, wide }: { line: BillLine; wide: boolean }) {
   if (wide) {
     return (
       <XStack items="center" gap="$3" py="$2">
-        <YStack flex={1} minW={0}>
-          <Text fontSize="$3" color="$color12" numberOfLines={2}>
-            {line.description}
-          </Text>
-        </YStack>
-        <Text
-          width={48}
-          text="right"
-          fontSize="$3"
-          color="$color10"
-          fontVariant={["tabular-nums"]}
-        >
+        <Text flex={1} fontSize={13} color="$color12" numberOfLines={2}>
+          {line.description}
+        </Text>
+        <Text width={44} text="right" fontSize={13} color="$text2" fontFamily="$mono">
           {line.quantity ?? "—"}
         </Text>
         <YStack width={120} items="flex-end">
-          <Money
-            amount={line.unitPrice}
-            currency={CURRENCY}
-            size="$3"
-            weight="500"
-            color="$color10"
-          />
+          <Money amount={line.unitPrice} size={13} weight="500" color="$text2" />
         </YStack>
-        <YStack width={140} items="flex-end">
-          <Money
-            amount={line.amount}
-            currency={CURRENCY}
-            size="$3"
-            weight="700"
-            color="$color12"
-          />
+        <YStack width={130} items="flex-end">
+          <Money amount={line.amount} size={13} color="$color12" />
         </YStack>
       </XStack>
     );
   }
   return (
     <XStack items="flex-start" justify="space-between" gap="$3" py="$2">
-      <YStack flex={1} minW={0} gap="$1">
-        <Text fontSize="$3" color="$color12">
+      <YStack flex={1} minW={0} gap="$0.5">
+        <Text fontSize={13} color="$color12">
           {line.description}
         </Text>
         {reconciles(line) ? (
-          <Text fontSize="$2" color="$color9" fontVariant={["tabular-nums"]}>
-            {line.quantity}
-            {" × "}
-            {`${CURRENCY} ${line.unitPrice!.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`}
+          <Text fontSize={11.5} color="$text3" fontFamily="$mono">
+            {line.quantity} × {dlMoney(line.unitPrice, CCY)}
           </Text>
         ) : line.quantity !== undefined && line.quantity !== 1 ? (
-          <Text fontSize="$2" color="$color9" fontVariant={["tabular-nums"]}>
+          <Text fontSize={11.5} color="$text3" fontFamily="$mono">
             Qty {line.quantity}
           </Text>
         ) : null}
       </YStack>
-      <Money
-        amount={line.amount}
-        currency={CURRENCY}
-        size="$3"
-        weight="700"
-        color="$color12"
-      />
+      <Money amount={line.amount} size={13} color="$color12" />
     </XStack>
   );
 }
 
-/** Column headers for the web itemization table. */
 function LineHeader() {
   return (
-    <XStack
-      items="center"
-      gap="$3"
-      pb="$1.5"
-      borderBottomWidth={1}
-      borderColor="$borderColor"
-    >
-      <Text
-        flex={1}
-        fontSize="$1"
-        fontWeight="700"
-        color="$color9"
-        textTransform="uppercase"
-      >
+    <XStack items="center" gap="$3" pb="$1.5" borderBottomWidth={1} borderColor="$border">
+      <Text flex={1} fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
         Item
       </Text>
-      <Text
-        width={48}
-        text="right"
-        fontSize="$1"
-        fontWeight="700"
-        color="$color9"
-        textTransform="uppercase"
-      >
+      <Text width={44} text="right" fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase">
         Qty
       </Text>
-      <Text
-        width={120}
-        text="right"
-        fontSize="$1"
-        fontWeight="700"
-        color="$color9"
-        textTransform="uppercase"
-      >
-        Unit price
+      <Text width={120} text="right" fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase">
+        Unit
       </Text>
-      <Text
-        width={140}
-        text="right"
-        fontSize="$1"
-        fontWeight="700"
-        color="$color9"
-        textTransform="uppercase"
-      >
+      <Text width={130} text="right" fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase">
         Amount
       </Text>
     </XStack>
   );
 }
 
-/** The insurance coverage block: scheme, claim code, covered vs you-pay. */
-function CoverageBlock({
-  insurance,
-}: { insurance: NonNullable<Bill["insurance"]> }) {
+function CoverageBlock({ insurance }: { insurance: NonNullable<Bill["insurance"]> }) {
   return (
-    <YStack
-      gap="$2.5"
-      mt="$2"
-      p="$3"
-      rounded="$6"
-      bg="$color2"
-      borderColor="$borderColor"
-      borderWidth={1}
-    >
+    <YStack gap="$2.5" p="$3.5" rounded={13} bg="$surface2" borderWidth={1} borderColor="$border">
       <XStack items="center" gap="$2">
-        <ShieldCheck size={16} color="$color11" />
-        <Text fontSize="$3" fontWeight="700" color="$color12">
+        <ShieldCheck size={16} color="$primary" />
+        <Text fontSize={13.5} fontWeight="700" color="$color12">
           {insurance.scheme}
         </Text>
       </XStack>
-
       <XStack gap="$6" flexWrap="wrap">
         {insurance.number ? (
           <YStack gap="$0.5">
-            <Text fontSize="$1" color="$color9">
+            <Text fontSize={11} color="$text2">
               Member number
             </Text>
-            <Text
-              fontSize="$2"
-              fontWeight="600"
-              color="$color11"
-              fontVariant={["tabular-nums"]}
-            >
+            <Text fontSize={12.5} fontWeight="600" color="$color11" fontFamily="$mono">
               {insurance.number}
             </Text>
           </YStack>
         ) : null}
         {insurance.claimCode ? (
           <YStack gap="$0.5">
-            <Text fontSize="$1" color="$color9">
+            <Text fontSize={11} color="$text2">
               Claim code
             </Text>
-            <Text
-              fontSize="$2"
-              fontWeight="600"
-              color="$color11"
-              fontVariant={["tabular-nums"]}
-            >
+            <Text fontSize={12.5} fontWeight="600" color="$color11" fontFamily="$mono">
               {insurance.claimCode}
             </Text>
           </YStack>
         ) : null}
         {insurance.status ? (
           <YStack gap="$0.5">
-            <Text fontSize="$1" color="$color9">
+            <Text fontSize={11} color="$text2">
               Status
             </Text>
-            <Text fontSize="$2" fontWeight="600" color="$color11">
+            <Text fontSize={12.5} fontWeight="600" color="$color11">
               {insurance.status}
             </Text>
           </YStack>
         ) : null}
       </XStack>
-
-      <XStack
-        gap="$3"
-        pt="$2.5"
-        borderTopWidth={1}
-        borderColor="$borderColor"
-        flexWrap="wrap"
-      >
-        <YStack flex={1} minW={140} gap="$1">
-          <Text fontSize="$2" color="$color9">
+      <XStack gap="$3" pt="$2.5" borderTopWidth={1} borderColor="$border" flexWrap="wrap">
+        <YStack flex={1} minW={130} gap="$1">
+          <Text fontSize={11.5} color="$text2">
             Paid or covered
           </Text>
-          <Theme name="success">
-            <Money
-              amount={insurance.covered}
-              currency={CURRENCY}
-              size="$5"
-              weight="700"
-              color="$color11"
-            />
-          </Theme>
+          <Money amount={insurance.covered} size={15} color="$good" />
         </YStack>
-        <YStack flex={1} minW={140} gap="$1">
-          <Text fontSize="$2" color="$color9">
+        <YStack flex={1} minW={130} gap="$1">
+          <Text fontSize={11.5} color="$text2">
             Your share to pay
           </Text>
-          <Theme name={insurance.patientPayable > 0 ? "warning" : "success"}>
-            <Money
-              amount={insurance.patientPayable}
-              currency={CURRENCY}
-              size="$5"
-              weight="700"
-              color="$color11"
-            />
-          </Theme>
+          <Money amount={insurance.patientPayable} size={15} color={insurance.patientPayable > 0 ? "$warn" : "$good"} />
         </YStack>
       </XStack>
-
-      <Text fontSize="$1" color="$color9" lineHeight="$1">
-        This bill is filed under your insurance. The covered amount is confirmed
-        by the hospital and may update as your claim is processed.
-      </Text>
     </YStack>
   );
 }
 
-/** One bill: header (number, date, status), itemized lines, totals, coverage. */
 function BillCard({ bill, wide }: { bill: Bill; wide: boolean }) {
   const status = billStatus(bill);
   return (
-    <Panel gap="$3">
-      <XStack
-        items="flex-start"
-        justify="space-between"
-        gap="$3"
-        flexWrap="wrap"
-      >
-        <YStack gap="$1" flex={1} minW={0}>
-          <Text
-            fontSize="$4"
-            fontWeight="700"
-            color="$color12"
-            numberOfLines={1}
-          >
+    <DLCard p="$4" gap="$3">
+      <XStack items="flex-start" justify="space-between" gap="$3" flexWrap="wrap">
+        <YStack gap="$0.5" flex={1} minW={0}>
+          <Text fontSize={14.5} fontWeight="700" color="$color12" numberOfLines={1}>
             {bill.number ?? "Bill"}
           </Text>
-          <DateText value={bill.date} fallback="Date not recorded" />
+          {bill.date ? (
+            <Text fontSize={12} color="$text2">
+              {bill.date.slice(0, 10)}
+            </Text>
+          ) : null}
         </YStack>
-        <StatusPill label={status.label} theme={status.theme} />
+        <DLStatusPill label={status.label} color={status.color} soft={status.soft} size="sm" />
       </XStack>
 
       {bill.lines.length > 0 ? (
@@ -415,118 +234,76 @@ function BillCard({ bill, wide }: { bill: Bill; wide: boolean }) {
           ))}
         </YStack>
       ) : (
-        <Text fontSize="$2" color="$color9">
+        <Text fontSize={12.5} color="$text3">
           Itemized charges are not available for this bill.
         </Text>
       )}
 
-      <YStack gap="$1.5" pt="$2" borderTopWidth={1} borderColor="$borderColor">
+      <YStack gap="$1.5" pt="$2.5" borderTopWidth={1} borderColor="$border">
         <XStack items="center" justify="space-between">
-          <Text fontSize="$3" color="$color10">
+          <Text fontSize={13} color="$text2">
             Total
           </Text>
-          <Money
-            amount={bill.total}
-            currency={CURRENCY}
-            size="$4"
-            weight="700"
-            color="$color12"
-          />
+          <Money amount={bill.total} size={14} />
         </XStack>
         {bill.insurance ? null : (
           <XStack items="center" justify="space-between">
-            <Text fontSize="$3" color="$color10">
+            <Text fontSize={13} color="$text2">
               Paid
             </Text>
-            <Money
-              amount={bill.paid}
-              currency={CURRENCY}
-              size="$4"
-              weight="600"
-              color="$color10"
-            />
+            <Money amount={bill.paid} size={14} weight="600" color="$text2" />
           </XStack>
         )}
         <XStack items="center" justify="space-between">
-          <Text fontSize="$3" fontWeight="700" color="$color12">
+          <Text fontSize={13.5} fontWeight="700" color="$color12">
             You owe
           </Text>
-          <Theme name={bill.due > 0 ? "warning" : "success"}>
-            <Money
-              amount={bill.due}
-              currency={CURRENCY}
-              size="$5"
-              weight="800"
-              color="$color12"
-            />
-          </Theme>
+          <Money amount={bill.due} size={17} color={bill.due > 0 ? "$warn" : "$good"} />
         </XStack>
       </YStack>
 
       {bill.insurance ? <CoverageBlock insurance={bill.insurance} /> : null}
-    </Panel>
+    </DLCard>
   );
 }
 
 export default function Billing() {
   const media = useMedia();
   const wide = Boolean(media.md);
-  const { data, isLoading, isError, refetch } = trpc.patientBills.useQuery(
-    undefined,
-    {
-      retry: 1,
-    },
-  );
+  const { data, isLoading, isError, refetch } = trpc.patientBills.useQuery(undefined, { retry: 1 });
 
-  if (isLoading) {
-    return (
-      <Screen>
-        <Section title="Billing and insurance">
-          <SkeletonList count={3} />
-        </Section>
-      </Screen>
-    );
-  }
+  return (
+    <DLScreen>
+      <DLTitle title="Billing" subtitle="Your charges and insurance coverage." />
 
-  if (isError) {
-    return (
-      <Screen>
+      {isLoading ? (
+        <SkeletonList count={3} />
+      ) : isError ? (
         <ErrorState
           title="Could not load your bills"
           detail="We could not reach the billing records right now. Please try again."
           onRetry={() => refetch()}
         />
-      </Screen>
-    );
-  }
-
-  const bills = data ?? [];
-
-  if (bills.length === 0) {
-    return (
-      <Screen>
+      ) : !data || data.length === 0 ? (
         <EmptyState
           Icon={Receipt}
           title="No bills"
           detail="You have no billing records yet. Charges from your hospital visits will appear here."
         />
-      </Screen>
-    );
-  }
-
-  return (
-    <Screen>
-      <Section title="Billing and insurance">
-        <YStack gap="$4">
-          <OutstandingHeader bills={bills} />
-          <ViewOnlyNote />
-          <YStack gap="$4">
-            {bills.map((bill) => (
-              <BillCard key={bill.id ?? bill.number} bill={bill} wide={wide} />
-            ))}
-          </YStack>
+      ) : (
+        <YStack gap="$3.5">
+          <OutstandingHeader bills={data} />
+          <XStack items="center" gap="$2.5" px="$3.5" py="$2.5" rounded={12} bg="$surface2" borderWidth={1} borderColor="$border">
+            <Info size={15} color="$text3" />
+            <Text flex={1} fontSize={12} color="$text2" lineHeight={17}>
+              This is a view of your charges and insurance. It is read only. To pay or ask about a charge, contact the hospital billing desk.
+            </Text>
+          </XStack>
+          {data.map((bill) => (
+            <BillCard key={bill.id ?? bill.number} bill={bill} wide={wide} />
+          ))}
         </YStack>
-      </Section>
-    </Screen>
+      )}
+    </DLScreen>
   );
 }

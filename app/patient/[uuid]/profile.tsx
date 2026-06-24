@@ -13,11 +13,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Building2,
   ChevronRight,
+  FileText,
   FlaskConical,
   Hospital as HospitalIcon,
   IdCard,
   LogOut,
   Phone,
+  Receipt,
   ShieldCheck,
   ShieldHalf,
 } from "@tamagui/lucide-icons";
@@ -304,6 +306,8 @@ export default function Profile() {
       <Section title="More">
         <Panel p="$0" gap="$0">
           {[
+            { Icon: Receipt, label: "Billing & insurance", to: "billing" },
+            { Icon: FileText, label: "Documents", to: "documents" },
             { Icon: FlaskConical, label: "Book a test", to: "book" },
             { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },
           ].map((item, i) => (
