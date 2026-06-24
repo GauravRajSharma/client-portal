@@ -183,6 +183,17 @@ export interface PatientOverview {
   };
 }
 
+/** A recorded allergy / intolerance (OpenMRS FHIR AllergyIntolerance). */
+export interface Allergy {
+  id: string;
+  substance: string;
+  /** FHIR criticality: low | high | unable-to-assess */
+  criticality?: string;
+  /** allergy categories, e.g. medication / food / environment */
+  categories: string[];
+  reactions: string[];
+}
+
 export type ImagingModality =
   | "usg"
   | "xray"
@@ -252,6 +263,12 @@ export interface CareStatus {
   steps: CareStep[];
   /** how many items are still pending, by service */
   pending: { lab: number; radiology: number; procedure: number; medication: number };
+  /** live admission context (patient-scoped) — present while currently admitted */
+  live?: {
+    isWard?: boolean;
+    /** current inpatient location / ward, e.g. "Inpatient (IPD)" */
+    ward?: string;
+  };
 }
 
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";
