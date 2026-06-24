@@ -9,3 +9,4 @@ export type { ChartPoint } from "./LineChart";
 export * from "./dl";
 export * from "./Pii";
 export * from "./care";
+export * from "./HtmlDoc";

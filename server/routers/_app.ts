@@ -27,6 +27,7 @@ import type {
     Patient,
     PatientDocument,
     PatientOverview,
+    PatientReport,
     Prescription,
     Visit,
     VisitDetail,
@@ -950,6 +951,33 @@ export const appRouter = router({
                     (rx.manifestation ?? []).map((m: any) => m.text ?? m.coding?.[0]?.display).filter(Boolean),
                 ),
             }));
+        } catch {
+            return [];
+        }
+    }),
+
+    /**
+     * patientReports — read-only written reports (radiology / procedure findings),
+     * stored in OpenMRS as result observations whose value is HTML. Newest first.
+     * Empty/blank reports are filtered out.
+     */
+    patientReports: protectedProcedure.query(async ({ ctx }): Promise<PatientReport[]> => {
+        try {
+            const fh = await ctx.clients.OpenmrsFHIRAPI<any>("Observation", {
+                query: { patient: ctx.auth.uuid, _count: "120", _sort: "-date" },
+            });
+            const entries: any[] = (fh?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            const isReport = (name: string) =>
+                /result|report|impression|finding|conclusion|interpretation/i.test(name);
+            const textLen = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim().length;
+            return entries
+                .map((r) => ({
+                    id: String(r.id ?? ""),
+                    title: r.code?.text ?? r.code?.coding?.[0]?.display ?? "Report",
+                    date: r.effectiveDateTime,
+                    html: typeof r.valueString === "string" ? r.valueString : "",
+                }))
+                .filter((r) => isReport(r.title) && textLen(r.html) > 0);
         } catch {
             return [];
         }

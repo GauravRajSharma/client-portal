@@ -37,6 +37,7 @@ const RECORD_LINKS = [
   { Icon: Stethoscope, title: "Visits", detail: "Appointments and admissions", seg: "visits" },
   { Icon: Pill, title: "Medicines", detail: "What you are taking now", seg: "meds" },
   { Icon: Scan, title: "Imaging", detail: "X-rays and scans", seg: "imaging" },
+  { Icon: FileText, title: "Reports", detail: "Radiology & procedure reports", seg: "reports" },
   { Icon: Receipt, title: "Billing", detail: "Charges and insurance", seg: "billing" },
   { Icon: FileText, title: "Documents", detail: "Summaries and reports", seg: "documents" },
 ];

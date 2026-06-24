@@ -316,6 +316,7 @@ export default function Profile() {
             { Icon: ShieldCheck, label: "Health passport", to: "passport" },
             { Icon: Receipt, label: "Billing & insurance", to: "billing" },
             { Icon: Scan, label: "Imaging", to: "imaging" },
+            { Icon: FileText, label: "Reports", to: "reports" },
             { Icon: FileText, label: "Documents", to: "documents" },
             { Icon: FlaskConical, label: "Book a test", to: "book" },
             { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },

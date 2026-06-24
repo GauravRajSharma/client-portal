@@ -293,6 +293,19 @@ export interface CareStatus {
   };
 }
 
+/**
+ * A written report (radiology / procedure findings, etc.), stored in OpenMRS as a
+ * result observation whose value is HTML. Rendered full-page in the document viewer.
+ */
+export interface PatientReport {
+  id: string;
+  /** report name from the concept, e.g. "Radiology results", "USG Report" */
+  title: string;
+  date?: string;
+  /** report body as HTML */
+  html: string;
+}
+
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";
 
 export interface PatientDocument {
