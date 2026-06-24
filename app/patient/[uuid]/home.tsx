@@ -1,22 +1,15 @@
 import { router, useGlobalSearchParams } from "expo-router";
 import {
-  Activity,
   ChevronRight,
-  Droplet,
   FileText,
-  FlaskConical,
-  HeartPulse,
   Pill,
   Receipt,
   Scan,
   ShieldAlert,
   Stethoscope,
-  TriangleAlert,
 } from "@tamagui/lucide-icons";
 import { Text, XStack, YStack } from "tamagui";
 import { trpc } from "@/utils/trpc";
-import { maskValue, usePrivacy } from "@/utils/privacy";
-import type { LabResult } from "@/server/dto";
 import {
   AlertBanner,
   CareCard,
@@ -24,13 +17,8 @@ import {
   DLNavRow,
   DLScreen,
   ErrorState,
-  LineChart,
-  MetricTile,
-  PatientMini,
   RecentRow,
   SkeletonList,
-  SummaryChips,
-  dlStatus,
 } from "@/components/ui";
 
 const RECORD_LINKS = [
@@ -41,8 +29,6 @@ const RECORD_LINKS = [
   { Icon: Receipt, title: "Billing", detail: "Charges and insurance", seg: "billing" },
   { Icon: FileText, title: "Documents", detail: "Summaries and reports", seg: "documents" },
 ];
-
-const TILE_ICONS = [Droplet, Activity, FlaskConical, HeartPulse];
 
 function greeting() {
   const h = new Date().getHours();
@@ -60,16 +46,18 @@ function initialsOf(name?: string) {
   );
 }
 
-/** Build a date-labelled trend (oldest -> newest) for one analyte name. */
-function trendFor(results: LabResult[], name: string) {
-  return results
-    .filter((r) => r.name === name && r.numericValue != null && r.takenAt)
-    .sort((a, b) => (a.takenAt! < b.takenAt! ? -1 : 1))
-    .map((r) => ({
-      label: (r.takenAt ?? "").slice(5, 10),
-      value: r.numericValue as number,
-      color: dlStatus(r.status).color,
-    }));
+/** One stat column in the results summary card. */
+function Stat({ value, label, color }: { value: string; label: string; color: any }) {
+  return (
+    <YStack flex={1} items="center" gap="$1">
+      <Text fontSize={26} fontWeight="700" fontFamily="$mono" color={color} letterSpacing={-0.5}>
+        {value}
+      </Text>
+      <Text fontSize={11.5} fontWeight="600" color="$text2">
+        {label}
+      </Text>
+    </YStack>
+  );
 }
 
 export default function Home() {
@@ -80,7 +68,6 @@ export default function Home() {
   const labsQ = trpc.patientAllLabResults.useQuery();
   const careQ = trpc.patientCareStatus.useQuery();
   const allergyQ = trpc.patientAllergies.useQuery();
-  const revealAll = usePrivacy((s) => s.revealAll);
 
   if (patientQ.isError || labsQ.isError) {
     return (
@@ -112,172 +99,89 @@ export default function Home() {
 
   const attention = results.filter((r) => r.status !== "normal" && r.status !== "unknown");
   const normalCount = results.filter((r) => r.status === "normal").length;
-
-  // 4 metric tiles: prefer recent numeric results (meaningful values + colored
-  // status), then fall back to fill any remaining slots with other distinct tests.
-  const seen = new Set<string>();
-  const tiles: LabResult[] = [];
-  const pickTiles = (pred: (r: LabResult) => boolean) => {
-    for (const r of results) {
-      if (tiles.length === 4) break;
-      if (seen.has(r.name) || !pred(r)) continue;
-      seen.add(r.name);
-      tiles.push(r);
-    }
-  };
-  pickTiles((r) => r.numericValue != null);
-  pickTiles(() => true);
-
-  const critical = attention[0];
-  const trend = critical ? trendFor(results, critical.name) : [];
-  const recent = results.slice(0, 5);
+  const recent = results.slice(0, 4);
 
   return (
     <DLScreen>
-      <YStack px="$0.5" mb="$1">
-        <Text fontSize={13} color="$text2">
-          {greeting()}
-        </Text>
-        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
-          Hello, {(patient?.name ?? "there").split(" ")[0]}
-        </Text>
-      </YStack>
+      {/* Compact header: greeting + name on the left, tappable avatar on the right. */}
+      <XStack items="center" justify="space-between" gap="$3" px="$0.5" py="$1">
+        <YStack flex={1} minW={0}>
+          <Text fontSize={13} color="$text2">
+            {greeting()}
+          </Text>
+          <Text fontSize={24} fontWeight="800" color="$color12" letterSpacing={-0.5} numberOfLines={1}>
+            {(patient?.name ?? "there").split(" ")[0]}
+          </Text>
+        </YStack>
+        <YStack
+          width={46}
+          height={46}
+          rounded={23}
+          bg="$primary"
+          items="center"
+          justify="center"
+          onPress={() => go("profile")}
+          pressStyle={{ opacity: 0.8 }}
+        >
+          <Text fontSize={16} fontWeight="700" color="$onPrimary">
+            {initialsOf(patient?.name)}
+          </Text>
+        </YStack>
+      </XStack>
+
+      {/* Priorities first: live visit, then allergy safety. */}
+      {careQ.data?.active ? <CareCard care={careQ.data} onPress={() => go("care")} /> : null}
 
       {allergyQ.data && allergyQ.data.length > 0 ? (
         <AlertBanner
           Icon={ShieldAlert}
-          title={`Allergy alert: ${allergyQ.data.map((a) => a.substance).slice(0, 3).join(", ")}`}
+          title={`Allergy: ${allergyQ.data.map((a) => a.substance).slice(0, 3).join(", ")}`}
           detail="Make sure your care team knows."
           onPress={() => go("passport")}
           Chevron={ChevronRight}
         />
       ) : null}
 
-      {careQ.data?.active ? (
-        <CareCard care={careQ.data} onPress={() => go("care")} />
-      ) : null}
-
-      {attention.length > 0 ? (
-        <AlertBanner
-          Icon={TriangleAlert}
-          title={`${attention.length} result${attention.length > 1 ? "s" : ""} need a closer look`}
-          detail={`Tap to review ${attention.slice(0, 2).map((r) => r.name).join(", ")}`}
-          Chevron={ChevronRight}
-          onPress={() => go("results")}
-        />
-      ) : results.length > 0 ? (
-        <AlertBanner
-          Icon={Activity}
-          title="All results are in range"
-          detail="Nothing needs your attention right now."
-        />
-      ) : null}
-
-      {patient ? (
-        <PatientMini
-          initials={initialsOf(patient.name)}
-          name={patient.name}
-          sub={[revealAll ? patient.mrn : maskValue(patient.mrn, "mrn"), patient.hospital?.name]
-            .filter(Boolean)
-            .join(" · ")}
-        />
-      ) : null}
-
-      <DLCard overflow="hidden">
-        <Text fontSize={15} fontWeight="700" color="$color12" px="$3.5" pt="$3.5" pb="$1">
-          Your records
-        </Text>
-        {RECORD_LINKS.map((l, i) => (
-          <DLNavRow
-            key={l.seg}
-            Icon={l.Icon}
-            title={l.title}
-            detail={l.detail}
-            onPress={() => go(l.seg)}
-            border={i > 0}
-          />
-        ))}
-      </DLCard>
-
-      {tiles.length > 0 ? (
-        <YStack gap="$2.5">
-          <XStack gap="$2.5">
-            {tiles.slice(0, 2).map((r, i) => {
-              const m = dlStatus(r.status);
-              return (
-                <MetricTile
-                  key={r.id}
-                  Icon={TILE_ICONS[i % TILE_ICONS.length]}
-                  label={r.name}
-                  value={r.value}
-                  unit={r.unit}
-                  color={m.color}
-                  soft={m.soft}
-                  onPress={() => go("results")}
-                />
-              );
-            })}
+      {/* One calm results summary — replaces the old banners, chips, and metric tiles. */}
+      {results.length > 0 ? (
+        <DLCard p="$4" gap="$3.5" onPress={() => go("results")} pressStyle={{ opacity: 0.85 }}>
+          <XStack items="center" justify="space-between">
+            <Text fontSize={15} fontWeight="700" color="$color12">
+              Your results
+            </Text>
+            <ChevronRight size={18} color="$text3" />
           </XStack>
-          {tiles.length > 2 ? (
-            <XStack gap="$2.5">
-              {tiles.slice(2, 4).map((r, i) => {
-                const m = dlStatus(r.status);
-                return (
-                  <MetricTile
-                    key={r.id}
-                    Icon={TILE_ICONS[(i + 2) % TILE_ICONS.length]}
-                    label={r.name}
-                    value={r.value}
-                    unit={r.unit}
-                    color={m.color}
-                    soft={m.soft}
-                    onPress={() => go("results")}
-                  />
-                );
-              })}
+          <XStack>
+            <Stat value={String(results.length)} label="Total" color="$color12" />
+            <YStack width={1} bg="$border" />
+            <Stat value={String(normalCount)} label="In range" color="$good" />
+            <YStack width={1} bg="$border" />
+            <Stat
+              value={String(attention.length)}
+              label="Needs review"
+              color={attention.length ? "$warn" : "$text3"}
+            />
+          </XStack>
+          {attention.length > 0 ? (
+            <XStack
+              items="center"
+              gap="$2"
+              bg="$warnSoft"
+              rounded={11}
+              px="$3"
+              py="$2.5"
+            >
+              <Text fontSize={12.5} fontWeight="600" color="$warn" flex={1}>
+                {attention.length} result{attention.length > 1 ? "s" : ""} to review:{" "}
+                {attention.slice(0, 2).map((r) => r.name).join(", ")}
+              </Text>
+              <ChevronRight size={15} color="$warn" />
             </XStack>
           ) : null}
-        </YStack>
-      ) : null}
-
-      {results.length > 0 ? (
-        <SummaryChips
-          items={[
-            { value: String(results.length), label: "Results" },
-            { value: String(normalCount), label: "Normal", color: "$good" },
-            {
-              value: String(attention.length),
-              label: "Attention",
-              color: attention.length ? "$warn" : "$text2",
-            },
-          ]}
-        />
-      ) : null}
-
-      {critical && trend.length > 1 ? (
-        <DLCard p="$4" gap="$2">
-          <XStack items="flex-start" justify="space-between">
-            <YStack>
-              <Text fontSize={11} fontWeight="600" color="$bad" textTransform="uppercase" letterSpacing={0.5}>
-                Needs attention
-              </Text>
-              <Text fontSize={15} fontWeight="700" color="$color12" mt="$1">
-                {critical.name} trend
-              </Text>
-            </YStack>
-            <YStack items="flex-end">
-              <Text fontSize={22} fontWeight="700" fontFamily="$mono" color={dlStatus(critical.status).color as any}>
-                {critical.value}
-              </Text>
-              <Text fontSize={11} color="$text2">
-                latest
-              </Text>
-            </YStack>
-          </XStack>
-          <LineChart points={trend} low={critical.referenceLow} high={critical.referenceHigh} height={150} />
         </DLCard>
       ) : null}
 
+      {/* Recent results — a short, scannable list. */}
       {recent.length > 0 ? (
         <DLCard overflow="hidden">
           <XStack items="center" justify="space-between" px="$4" py="$3" borderBottomWidth={1} borderColor="$border">
@@ -296,6 +200,23 @@ export default function Home() {
           ))}
         </DLCard>
       ) : null}
+
+      {/* Records navigation. */}
+      <DLCard overflow="hidden">
+        <Text fontSize={15} fontWeight="700" color="$color12" px="$3.5" pt="$3.5" pb="$1">
+          Your records
+        </Text>
+        {RECORD_LINKS.map((l, i) => (
+          <DLNavRow
+            key={l.seg}
+            Icon={l.Icon}
+            title={l.title}
+            detail={l.detail}
+            onPress={() => go(l.seg)}
+            border={i > 0}
+          />
+        ))}
+      </DLCard>
     </DLScreen>
   );
 }
