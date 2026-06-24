@@ -1,5 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { BedDouble, Pill, ShieldAlert, ShieldCheck, TriangleAlert } from "@tamagui/lucide-icons";
+import {
+  BedDouble,
+  ClipboardList,
+  HeartPulse,
+  Pill,
+  ShieldAlert,
+  ShieldCheck,
+  TriangleAlert,
+} from "@tamagui/lucide-icons";
 import { Text, XStack, YStack } from "tamagui";
 import {
   DLBack,
@@ -32,11 +40,15 @@ export default function Passport() {
   const allergyQ = trpc.patientAllergies.useQuery();
   const medsQ = trpc.patientActiveMedications.useQuery();
   const careQ = trpc.patientCareStatus.useQuery();
+  const vitalsQ = trpc.patientVitals.useQuery();
+  const conditionsQ = trpc.patientConditions.useQuery();
 
   const patient = patientQ.data;
   const allergies = allergyQ.data ?? [];
   const meds = (medsQ.data ?? []).filter((m) => m.active);
   const care = careQ.data;
+  const vitals = vitalsQ.data ?? [];
+  const conditions = conditionsQ.data ?? [];
   const loading = patientQ.isLoading || allergyQ.isLoading || medsQ.isLoading;
 
   return (
@@ -125,6 +137,41 @@ export default function Passport() {
             )}
           </DLCard>
 
+          {/* Problem list — active conditions first */}
+          {conditions.length ? (
+            <DLCard p="$4" gap="$2.5">
+              <XStack items="center" gap="$2">
+                <ClipboardList size={18} color="$primary" />
+                <Text fontSize={14.5} fontWeight="800" color="$color12">
+                  Problem list
+                </Text>
+              </XStack>
+              {conditions.map((c) => {
+                const inactive = c.clinicalStatus && c.clinicalStatus !== "active";
+                const since = (c.onset ?? c.recordedAt)?.slice(0, 10);
+                return (
+                  <XStack key={c.id} items="center" justify="space-between" gap="$3">
+                    <YStack flex={1} minW={0}>
+                      <Text fontSize={14} fontWeight="600" color="$color12" numberOfLines={2}>
+                        {c.name}
+                      </Text>
+                      {since ? (
+                        <Text fontSize={12} color="$text2">
+                          Since {since}
+                        </Text>
+                      ) : null}
+                    </YStack>
+                    {inactive ? (
+                      <Text fontSize={11} fontWeight="700" color="$text3" textTransform="capitalize">
+                        {c.clinicalStatus}
+                      </Text>
+                    ) : null}
+                  </XStack>
+                );
+              })}
+            </DLCard>
+          ) : null}
+
           {/* Active medicines */}
           <DLCard p="$4" gap="$2.5">
             <XStack items="center" gap="$2">
@@ -152,6 +199,49 @@ export default function Passport() {
               </Text>
             )}
           </DLCard>
+
+          {/* Latest vitals */}
+          {vitals.length ? (
+            <DLCard p="$4" gap="$3">
+              <XStack items="center" gap="$2">
+                <HeartPulse size={18} color="$primary" />
+                <Text fontSize={14.5} fontWeight="800" color="$color12">
+                  Latest vitals
+                </Text>
+              </XStack>
+              <XStack flexWrap="wrap" gap="$2.5">
+                {vitals.map((v) => (
+                  <YStack
+                    key={v.key}
+                    width="48%"
+                    bg="$surface2"
+                    rounded={12}
+                    px="$3"
+                    py="$2.5"
+                    gap="$0.5"
+                  >
+                    <Text fontSize={11.5} fontWeight="600" color="$text2">
+                      {v.label}
+                    </Text>
+                    <Text fontSize={18} fontWeight="700" fontFamily="$mono" color="$color12" letterSpacing={-0.5}>
+                      {v.value}
+                      {v.unit ? (
+                        <Text fontSize={10.5} color="$text3" fontWeight="500" fontFamily="$body">
+                          {" "}
+                          {v.unit}
+                        </Text>
+                      ) : null}
+                    </Text>
+                    {v.takenAt ? (
+                      <Text fontSize={10.5} color="$text3">
+                        {v.takenAt.slice(0, 10)}
+                      </Text>
+                    ) : null}
+                  </YStack>
+                ))}
+              </XStack>
+            </DLCard>
+          ) : null}
 
           <Text fontSize={11.5} color="$text3" text="center" px="$4">
             Read-only summary from your hospital records. Not a substitute for clinical assessment.

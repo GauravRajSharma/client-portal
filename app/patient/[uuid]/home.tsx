@@ -1,8 +1,10 @@
 import { router, useGlobalSearchParams } from "expo-router";
 import {
+  BadgeCheck,
   ChevronRight,
   FileText,
   FlaskConical,
+  HeartPulse,
   Pill,
   Receipt,
   Scan,
@@ -24,11 +26,13 @@ import {
 } from "@/components/ui";
 
 const RECORD_LINKS = [
+  { Icon: HeartPulse, title: "Health summary", detail: "Allergies, conditions, vitals", seg: "passport" },
   { Icon: Stethoscope, title: "Visits", detail: "Appointments and admissions", seg: "visits" },
   { Icon: Pill, title: "Medicines", detail: "What you are taking now", seg: "meds" },
   { Icon: Scan, title: "Imaging", detail: "X-rays and scans", seg: "imaging" },
   { Icon: FileText, title: "Reports", detail: "Radiology & procedure reports", seg: "reports" },
   { Icon: Receipt, title: "Billing", detail: "Charges and insurance", seg: "billing" },
+  { Icon: BadgeCheck, title: "Insurance", detail: "NHIS claims and coverage", seg: "insurance" },
   { Icon: FileText, title: "Documents", detail: "Summaries and reports", seg: "documents" },
 ];
 

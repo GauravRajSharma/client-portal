@@ -5,7 +5,18 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
-import { clean, toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import {
+    clean,
+    toBill,
+    toConditions,
+    toInsuranceClaim,
+    toLabResult,
+    toMedication,
+    toPatient,
+    toVisit,
+    toVisitDetail,
+    toVitals,
+} from "../adapters";
 import { ttlCache } from "../lib/cache";
 import { rateLimit } from "../lib/ratelimit";
 import { authDb } from "../auth";
@@ -21,10 +32,13 @@ import type {
     BedAvailability,
     Bill,
     CareStatus,
+    Condition,
     PublicDoctor,
     ImagingStudy,
+    InsuranceClaim,
     LabResult,
     Medication,
+    NhisBalance,
     Patient,
     PatientDocument,
     PatientOverview,
@@ -32,6 +46,7 @@ import type {
     Prescription,
     Visit,
     VisitDetail,
+    Vital,
 } from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
@@ -1100,6 +1115,52 @@ export const appRouter = router({
         }
     }),
 
+    /**
+     * patientVitals — latest vital signs from OpenMRS FHIR Observations. We pull the
+     * vital-signs category newest-first and keep the most recent reading per metric.
+     * Empty list ("none recorded") is a valid answer.
+     */
+    patientVitals: protectedProcedure.query(async ({ ctx }): Promise<Vital[]> => {
+        try {
+            // Prefer the FHIR vital-signs category; fall back to all observations if the
+            // server doesn't honour the category param (then toVitals classifies by name).
+            const fh = await ctx.clients.OpenmrsFHIRAPI<any>("Observation", {
+                query: {
+                    patient: ctx.auth.uuid,
+                    category: "vital-signs",
+                    _count: "80",
+                    _sort: "-date",
+                },
+            });
+            let entries: any[] = (fh?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            if (entries.length === 0) {
+                const all = await ctx.clients.OpenmrsFHIRAPI<any>("Observation", {
+                    query: { patient: ctx.auth.uuid, _count: "120", _sort: "-date" },
+                });
+                entries = (all?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            }
+            return toVitals(entries);
+        } catch {
+            return [];
+        }
+    }),
+
+    /**
+     * patientConditions — the problem list from OpenMRS FHIR Condition (active first).
+     * Empty list ("none recorded") is a valid answer.
+     */
+    patientConditions: protectedProcedure.query(async ({ ctx }): Promise<Condition[]> => {
+        try {
+            const fh = await ctx.clients.OpenmrsFHIRAPI<any>("Condition", {
+                query: { patient: ctx.auth.uuid, _count: "100" },
+            });
+            const entries: any[] = (fh?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            return toConditions(entries);
+        } catch {
+            return [];
+        }
+    }),
+
     patientBills: protectedProcedure.query(async ({ ctx }): Promise<Bill[]> => {
         let nhisNumber: string | undefined;
         try {
@@ -1206,6 +1267,122 @@ export const appRouter = router({
                 return toBill(inv, lines, { nhisNumber, orderedBy: orderedByMove.get(inv.id) });
             }),
         );
+    }),
+
+    /**
+     * patientInsuranceClaims — NHIS/HIB claims and their lifecycle (Odoo insurance.claim
+     * + insurance.claim.history). Read-only. Tolerant: if the who_insurance addon is not
+     * installed on a site, the query throws and we return []. Newest first.
+     */
+    patientInsuranceClaims: protectedProcedure.query(async ({ ctx }): Promise<InsuranceClaim[]> => {
+        try {
+            const claims = await ctx.clients.OdooAPI.rpc<any[]>({
+                model: "insurance.claim",
+                method: "search_read",
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: [
+                        "id",
+                        "claim_code",
+                        "provider_claim_code",
+                        "state",
+                        "care_type",
+                        "claimed_date",
+                        "claimed_received_date",
+                        "claimed_amount_total",
+                        "amount_approved_total",
+                        "rejection_reason",
+                        "currency_id",
+                    ],
+                    order: "claimed_date desc, id desc",
+                    limit: 100,
+                },
+            });
+            if (!Array.isArray(claims) || claims.length === 0) return [];
+
+            // State-transition history for the timeline (best-effort).
+            const historyByClaim = new Map<number, any[]>();
+            try {
+                const history = await ctx.clients.OdooAPI.rpc<any[]>({
+                    model: "insurance.claim.history",
+                    method: "search_read",
+                    args: [[["claim_id", "in", claims.map((c) => c.id)]]],
+                    kwargs: {
+                        fields: ["claim_id", "state", "create_date", "claim_comments", "rejection_reason"],
+                        order: "create_date asc",
+                        limit: 500,
+                    },
+                });
+                for (const h of history ?? []) {
+                    const cid = Array.isArray(h.claim_id) ? h.claim_id[0] : h.claim_id;
+                    if (!historyByClaim.has(cid)) historyByClaim.set(cid, []);
+                    historyByClaim.get(cid)!.push(h);
+                }
+            } catch {
+                // no history -> claims still render, just without a timeline
+            }
+
+            return claims.map((c) => toInsuranceClaim(c, historyByClaim.get(c.id) ?? []));
+        } catch {
+            return [];
+        }
+    }),
+
+    /**
+     * patientNhisBalance — the patient's last KNOWN NHIS/HIB balance. The live balance
+     * lives in IMIS and is not stored per patient; Odoo only snapshots it onto each claim
+     * at creation. So we return the snapshot from the most recent claim, dated, and never
+     * invent a balance. No claims -> just the NHIS number (or nothing).
+     */
+    patientNhisBalance: protectedProcedure.query(async ({ ctx }): Promise<NhisBalance> => {
+        let number: string | undefined;
+        try {
+            const partners = await ctx.clients.OdooAPI.rpc<{ nhis_number: string | false }[]>({
+                model: "res.partner",
+                method: "search_read",
+                args: [[["uuid", "=", ctx.auth.uuid]]],
+                kwargs: { fields: ["nhis_number"], limit: 1 },
+            });
+            const raw = partners?.[0]?.nhis_number;
+            number = raw && raw !== "" ? String(raw) : undefined;
+        } catch {
+            number = undefined;
+        }
+
+        try {
+            const claims = await ctx.clients.OdooAPI.rpc<any[]>({
+                model: "insurance.claim",
+                method: "search_read",
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: [
+                        "claimed_date",
+                        "insurance_balance_amount",
+                        "selected_benefit_balance_amount",
+                        "currency_id",
+                    ],
+                    order: "claimed_date desc, id desc",
+                    limit: 1,
+                },
+            });
+            const c = claims?.[0];
+            if (c) {
+                return {
+                    number,
+                    totalBalance:
+                        typeof c.insurance_balance_amount === "number" ? c.insurance_balance_amount : undefined,
+                    benefitBalance:
+                        typeof c.selected_benefit_balance_amount === "number"
+                            ? c.selected_benefit_balance_amount
+                            : undefined,
+                    asOf: c.claimed_date && c.claimed_date !== false ? String(c.claimed_date) : undefined,
+                    currency: Array.isArray(c.currency_id) ? String(c.currency_id[1]) : "NPR",
+                };
+            }
+        } catch {
+            // addon absent / no claims -> fall through to number-only
+        }
+        return { number, currency: "NPR" };
     }),
 });
 
