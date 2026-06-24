@@ -9,6 +9,9 @@
 import type {
   Bill,
   BillLine,
+  ClaimEvent,
+  Condition,
+  InsuranceClaim,
   InsuranceCoverage,
   LabResult,
   LabStatus,
@@ -19,6 +22,7 @@ import type {
   Visit,
   VisitDetail,
   VisitType,
+  Vital,
 } from "../dto";
 
 const num = (v: unknown): number | undefined => {
@@ -51,6 +55,201 @@ export function toPatient(
       hospitalCode || hospitalName
         ? { code: hospitalCode ?? "", name: hospitalName ?? "" }
         : undefined,
+  };
+}
+
+/* ---- OpenMRS FHIR clinical-safety adapters ---- */
+
+const fhirText = (codeable: any): string =>
+  codeable?.text ?? codeable?.coding?.[0]?.display ?? "";
+
+/**
+ * toVitals — pick the latest reading per vital from FHIR Observations (newest-first input).
+ * Tolerant of how a deployment encodes things: blood pressure as one Observation with
+ * systolic/diastolic components OR as two separate observations; everything else as a
+ * single valueQuantity. Classifies by the observation's display text so it survives
+ * differing concept codings.
+ */
+export function toVitals(resources: any[]): Vital[] {
+  const qty = (x: any): { v?: number; unit?: string } | undefined =>
+    x?.valueQuantity?.value != null
+      ? { v: num(x.valueQuantity.value), unit: str(x.valueQuantity.unit) }
+      : undefined;
+  const fmt = (n?: number) => (n == null ? "–" : String(Math.round(n * 10) / 10));
+
+  const list = Array.isArray(resources) ? resources : [];
+
+  // Blood pressure: take the newest with both parts available.
+  let sys: number | undefined;
+  let dia: number | undefined;
+  let bpUnit: string | undefined;
+  let bpDate: string | undefined;
+  for (const o of list) {
+    const t = fhirText(o?.code);
+    const comps: any[] = Array.isArray(o?.component) ? o.component : [];
+    const sc = comps.find((c) => /systolic/i.test(fhirText(c?.code)));
+    const dc = comps.find((c) => /diastolic/i.test(fhirText(c?.code)));
+    const isBp = /blood pressure|systolic|diastolic/i.test(t) || sc || dc;
+    if (!isBp) continue;
+    if (sys == null) {
+      const v = sc ? num(sc.valueQuantity?.value) : /systolic/i.test(t) ? qty(o)?.v : undefined;
+      if (v != null) {
+        sys = v;
+        bpUnit = (sc ? str(sc.valueQuantity?.unit) : qty(o)?.unit) ?? bpUnit;
+        bpDate = str(o?.effectiveDateTime) ?? bpDate;
+      }
+    }
+    if (dia == null) {
+      const v = dc ? num(dc.valueQuantity?.value) : /diastolic/i.test(t) ? qty(o)?.v : undefined;
+      if (v != null) dia = v;
+    }
+    if (sys != null && dia != null) break;
+  }
+
+  const vitals: Vital[] = [];
+  const seen = new Set<string>();
+  if (sys != null || dia != null) {
+    vitals.push({
+      key: "bp",
+      label: "Blood pressure",
+      value: `${fmt(sys)}/${fmt(dia)}`,
+      unit: bpUnit ?? "mmHg",
+      takenAt: bpDate,
+    });
+    seen.add("bp");
+  }
+
+  const defs = [
+    { key: "pulse", label: "Pulse", re: /pulse|heart rate/i },
+    { key: "temp", label: "Temperature", re: /temperature/i },
+    { key: "spo2", label: "SpO₂", re: /spo2|spo₂|oxygen sat|o2 sat|saturation/i },
+    { key: "resp", label: "Respiratory rate", re: /respirat/i },
+    { key: "weight", label: "Weight", re: /weight/i },
+    { key: "height", label: "Height", re: /height/i },
+    { key: "bmi", label: "BMI", re: /bmi|body mass index/i },
+  ];
+  for (const o of list) {
+    const t = fhirText(o?.code);
+    const q = qty(o);
+    if (!q || q.v == null) continue;
+    for (const d of defs) {
+      if (seen.has(d.key) || !d.re.test(t)) continue;
+      vitals.push({ key: d.key, label: d.label, value: fmt(q.v), unit: q.unit, takenAt: str(o?.effectiveDateTime) });
+      seen.add(d.key);
+    }
+  }
+
+  const order = ["bp", "pulse", "temp", "spo2", "resp", "weight", "height", "bmi"];
+  return vitals.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+}
+
+/** toConditions — FHIR Condition resources -> problem-list DTOs (active first). */
+export function toConditions(resources: any[]): Condition[] {
+  const list = Array.isArray(resources) ? resources : [];
+  const items = list.map(
+    (c): Condition => ({
+      id: String(c?.id ?? ""),
+      name: fhirText(c?.code) || "Condition",
+      clinicalStatus: str(c?.clinicalStatus?.coding?.[0]?.code),
+      verificationStatus: str(c?.verificationStatus?.coding?.[0]?.code),
+      onset: str(c?.onsetDateTime),
+      recordedAt: str(c?.recordedDate),
+    }),
+  );
+  const rank = (s?: string) => (s === "active" || s == null ? 0 : 1);
+  return items.sort((a, b) => {
+    const r = rank(a.clinicalStatus) - rank(b.clinicalStatus);
+    if (r !== 0) return r;
+    return (b.recordedAt ?? b.onset ?? "") > (a.recordedAt ?? a.onset ?? "") ? 1 : -1;
+  });
+}
+
+/* ---- Insurance claim lifecycle (Odoo insurance.claim + .history) ---- */
+
+/** insurance.claim / insurance.claim.history state -> plain-language label. */
+export function claimStateLabel(state?: string): string {
+  switch (state) {
+    case "draft":
+      return "Draft";
+    case "confirmed":
+      return "Confirmed";
+    case "submitted_without_docs":
+      return "Submitted (receipts pending)";
+    case "submit_unconfirmed":
+      return "Submitted (verifying)";
+    case "submitted":
+      return "Submitted";
+    case "checked":
+      return "Under review";
+    case "valuated":
+    case "passed":
+      return "Approved";
+    case "processed":
+      return "Processed";
+    case "rejected":
+      return "Rejected";
+    case "no-show":
+      return "No show";
+    default:
+      return state ? String(state) : "—";
+  }
+}
+
+/** Status pill tone for a claim state. */
+function claimTone(state?: string): InsuranceClaim["tone"] {
+  switch (state) {
+    case "valuated":
+    case "passed":
+    case "processed":
+      return "good";
+    case "rejected":
+    case "no-show":
+      return "bad";
+    case "submitted":
+    case "submitted_without_docs":
+    case "submit_unconfirmed":
+    case "checked":
+    case "confirmed":
+      return "warn";
+    default:
+      return "neutral";
+  }
+}
+
+const moneyOrUndef = (v: unknown): number | undefined => {
+  const n = num(v);
+  return n; // 0 is a legitimate amount; keep it
+};
+
+/**
+ * toInsuranceClaim — one insurance.claim row + its history rows -> DTO.
+ * History rows are this claim's only (filter upstream); sorted oldest-first here.
+ */
+export function toInsuranceClaim(raw: any, historyRows: any[] = []): InsuranceClaim {
+  const currency = Array.isArray(raw?.currency_id) ? String(raw.currency_id[1]) : "NPR";
+  const timeline: ClaimEvent[] = (historyRows ?? [])
+    .map((h: any): ClaimEvent => ({
+      state: String(h?.state ?? ""),
+      label: claimStateLabel(h?.state),
+      at: str(h?.create_date),
+      note: str(h?.rejection_reason) ?? str(h?.claim_comments),
+    }))
+    .sort((a, b) => (a.at ?? "") < (b.at ?? "") ? -1 : 1);
+
+  return {
+    id: String(raw?.id ?? ""),
+    claimCode: str(raw?.provider_claim_code) ?? str(raw?.claim_code),
+    state: str(raw?.state),
+    statusLabel: claimStateLabel(raw?.state),
+    tone: claimTone(raw?.state),
+    careType: raw?.care_type === "I" ? "Inpatient" : raw?.care_type === "O" ? "Outpatient" : undefined,
+    claimedOn: str(raw?.claimed_date),
+    receivedOn: str(raw?.claimed_received_date),
+    claimedAmount: moneyOrUndef(raw?.claimed_amount_total),
+    approvedAmount: moneyOrUndef(raw?.amount_approved_total),
+    currency,
+    rejectionReason: str(raw?.rejection_reason),
+    timeline,
   };
 }
 

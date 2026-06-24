@@ -179,6 +179,58 @@ export interface Bill {
   insurance?: InsuranceCoverage;
 }
 
+/** One state transition in a claim's life (insurance.claim.history). */
+export interface ClaimEvent {
+  /** machine state, e.g. "submitted" */
+  state: string;
+  /** plain-language label, e.g. "Submitted" */
+  label: string;
+  at?: string; // ISO (history row create date)
+  note?: string; // comments / rejection reason at that step
+}
+
+/**
+ * An NHIS / HIB insurance claim and its lifecycle (Odoo insurance.claim +
+ * insurance.claim.history). Read-only; amounts are exactly what the backend stored.
+ */
+export interface InsuranceClaim {
+  id: string;
+  /** the claim code (provider code once HIB returns it, else our internal code) */
+  claimCode?: string;
+  /** machine state, e.g. "valuated" */
+  state?: string;
+  /** plain-language status, e.g. "Approved", "Under review" */
+  statusLabel: string;
+  /** good | warn | bad | neutral — for the status pill */
+  tone: "good" | "warn" | "bad" | "neutral";
+  careType?: "Inpatient" | "Outpatient";
+  claimedOn?: string; // ISO
+  receivedOn?: string; // ISO
+  claimedAmount?: number;
+  approvedAmount?: number;
+  currency: string; // "NPR"
+  rejectionReason?: string;
+  /** state-transition history, oldest first */
+  timeline: ClaimEvent[];
+}
+
+/**
+ * Last known NHIS / HIB balance. The live balance lives in IMIS and is NOT stored per
+ * patient — Odoo only snapshots it onto each claim at creation. So this is the snapshot
+ * from the patient's most recent claim, labelled with the date it was taken. Absent when
+ * the patient has no claims (we never invent a balance).
+ */
+export interface NhisBalance {
+  number?: string;
+  /** total insurance balance snapshot at the last claim */
+  totalBalance?: number;
+  /** balance for the selected benefit policy at the last claim */
+  benefitBalance?: number;
+  /** ISO date this snapshot was taken (the claim's date) */
+  asOf?: string;
+  currency: string; // "NPR"
+}
+
 /**
  * PatientOverview — a read-only aggregate for the Home screen. It composes data the
  * patient most needs at a glance, so Home makes one call instead of fanning out:
@@ -214,6 +266,32 @@ export interface Allergy {
   /** allergy categories, e.g. medication / food / environment */
   categories: string[];
   reactions: string[];
+}
+
+/**
+ * A latest vital sign reading (OpenMRS FHIR Observation, category vital-signs).
+ * `value` is a display string ("120/80", "72", "36.8") so blood pressure and single
+ * metrics share one shape; the screen never parses it.
+ */
+export interface Vital {
+  /** stable metric key: bp | pulse | temp | spo2 | resp | weight | height | bmi */
+  key: string;
+  label: string;
+  value: string;
+  unit?: string;
+  takenAt?: string; // ISO
+}
+
+/** An active/past problem (OpenMRS FHIR Condition). */
+export interface Condition {
+  id: string;
+  name: string;
+  /** FHIR clinical status: active | inactive | resolved | recurrence | remission */
+  clinicalStatus?: string;
+  /** FHIR verification status: confirmed | provisional | differential | unconfirmed */
+  verificationStatus?: string;
+  onset?: string; // ISO
+  recordedAt?: string; // ISO
 }
 
 export type ImagingModality =

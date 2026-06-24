@@ -1,9 +1,11 @@
 import { useMemo } from "react";
-import { Info, Receipt, ShieldCheck } from "@tamagui/lucide-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { BadgeCheck, Info, Receipt, ShieldCheck } from "@tamagui/lucide-icons";
 import { Text, XStack, YStack, useMedia } from "tamagui";
 import type { Bill, BillLine } from "@/server/dto";
 import {
   DLCard,
+  DLNavRow,
   DLScreen,
   DLStatusPill,
   DLTitle,
@@ -303,11 +305,22 @@ function BillCard({ bill, wide }: { bill: Bill; wide: boolean }) {
 export default function Billing() {
   const media = useMedia();
   const wide = Boolean(media.md);
+  const { uuid } = useLocalSearchParams<{ uuid: string }>();
   const { data, isLoading, isError, refetch } = trpc.patientBills.useQuery(undefined, { retry: 1 });
 
   return (
     <DLScreen>
       <DLTitle title="Billing" subtitle="Your charges and insurance coverage." />
+
+      {/* Claim lifecycle + NHIS balance live on their own screen. */}
+      <DLCard overflow="hidden">
+        <DLNavRow
+          Icon={BadgeCheck}
+          title="Insurance claims & balance"
+          detail="NHIS / HIB claim status and coverage"
+          onPress={() => router.push(`/patient/${uuid}/insurance` as any)}
+        />
+      </DLCard>
 
       {isLoading ? (
         <SkeletonList count={3} />
