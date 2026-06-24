@@ -918,6 +918,8 @@ export const appRouter = router({
                 steps: flow.map((st: any) => ({
                     key: st.key,
                     label: friendlyStep(st.key, st.label),
+                    detail: stepDetail(st.key, st.status, st.evidence ?? {}),
+                    at: st.completedAt ?? st.startedAt ?? undefined,
                     status: st.status,
                 })),
                 pending: {
@@ -1236,6 +1238,49 @@ const STEP_LABELS: Record<string, string> = {
 };
 function friendlyStep(key: string, fallback?: string): string {
     return STEP_LABELS[key] ?? fallback ?? key;
+}
+
+/** A richer, patient-friendly one-liner for a care step, using the throughput evidence. */
+function stepDetail(
+    key: string,
+    status: string,
+    ev: Record<string, any>,
+): string | undefined {
+    const n = (x: any) => (typeof x === "number" ? x : 0);
+    const plural = (c: number, w: string) => `${c} ${w}${c === 1 ? "" : "s"}`;
+    switch (key) {
+        case "ticket":
+            return "Your visit was registered at the hospital";
+        case "doctor_assessment":
+            return n(ev.providerInteractionCount) > 0
+                ? `Doctor recorded your history and examination (${plural(n(ev.providerInteractionCount), "note")})`
+                : "Doctor recorded your assessment";
+        case "investigations_ordered":
+            return n(ev.investigationOrderCount) > 0
+                ? `${plural(n(ev.investigationOrderCount), "investigation")} ordered (lab / imaging)`
+                : "Investigations ordered";
+        case "investigations_fulfilled": {
+            const done = n(ev.resultedInvestigations ?? ev.resultedInvestigationItems);
+            const pending = n(ev.pendingInvestigations ?? ev.pendingInvestigationOrders);
+            if (status === "completed") return `${plural(done, "result")} returned`;
+            if (pending > 0) return `${done} back, ${pending} still pending`;
+            return "Waiting for your results to come back";
+        }
+        case "doctor_review_prescription":
+            return ev.hasMedicationOrder
+                ? "Doctor reviewed results and prescribed medicine"
+                : "Doctor reviewed your results";
+        case "pharmacy":
+            return ev.hasMedicationBilling
+                ? "Medicines dispensed at the pharmacy"
+                : "Collect your medicines at the pharmacy";
+        case "exit":
+            return status === "completed"
+                ? "Visit closed"
+                : "You will be discharged when care is complete";
+        default:
+            return undefined;
+    }
 }
 
 /** Plain-language label for an OpenMRS order fulfillerStatus. */
