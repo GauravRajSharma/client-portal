@@ -29,6 +29,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
 import { asyncStoragePersister } from "@/utils/mmkv";
+import { usePrivacy } from "@/utils/privacy";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -92,6 +93,11 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Restore the saved "reveal PII" preference (defaults to hidden).
+  useEffect(() => {
+    usePrivacy.getState().hydrate();
+  }, []);
 
   if (!loaded) {
     return null;

@@ -3,10 +3,13 @@ import {
   ErrorState,
   LanguageToggle,
   Panel,
+  PiiValue,
+  PrivacyToggle,
   Screen,
   Section,
   Skeleton,
 } from "@/components/ui";
+import type { PiiKind } from "@/utils/privacy";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -45,11 +48,13 @@ function DetailRow({
   label,
   value,
   placeholder,
+  pii,
 }: {
   Icon: NamedExoticComponent<any>;
   label: string;
   value?: string;
   placeholder: string;
+  pii?: PiiKind;
 }) {
   const has = !!value && value.trim().length > 0;
   return (
@@ -61,14 +66,18 @@ function DetailRow({
         <Text fontSize="$2" color="$color9" fontWeight="600">
           {label}
         </Text>
-        <Text
-          fontSize="$5"
-          fontWeight={has ? "700" : "500"}
-          color={has ? "$color12" : "$color9"}
-          fontVariant={["tabular-nums"]}
-        >
-          {has ? value : placeholder}
-        </Text>
+        {pii && has ? (
+          <PiiValue value={value} kind={pii} fontSize={17} fontWeight="700" />
+        ) : (
+          <Text
+            fontSize="$5"
+            fontWeight={has ? "700" : "500"}
+            color={has ? "$color12" : "$color9"}
+            fontVariant={["tabular-nums"]}
+          >
+            {has ? value : placeholder}
+          </Text>
+        )}
       </YStack>
     </XStack>
   );
@@ -221,15 +230,7 @@ export default function Profile() {
           </Text>
           <XStack gap="$1.5" items="center">
             <IdCard size={14} color="$color9" />
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              color="$color10"
-              fontVariant={["tabular-nums"]}
-              numberOfLines={1}
-            >
-              {data.mrn || placeholder}
-            </Text>
+            <PiiValue value={data.mrn} kind="mrn" fontSize={13} fontWeight="600" color="$color10" />
           </XStack>
           {data.hospital?.name ? (
             <XStack gap="$1.5" items="center">
@@ -271,6 +272,7 @@ export default function Profile() {
           label={T("profile.field.insurance")}
           value={data.insuranceNumber}
           placeholder={placeholder}
+          pii="id"
         />
         <Separator borderColor="$borderColor" />
         <DetailRow
@@ -278,6 +280,7 @@ export default function Profile() {
           label={T("profile.field.phone")}
           value={data.phone}
           placeholder={placeholder}
+          pii="phone"
         />
       </Panel>
     </Section>
@@ -289,7 +292,10 @@ export default function Profile() {
         <Text fontSize="$8" fontWeight="800" color="$color12">
           {T("profile.title")}
         </Text>
-        <LanguageToggle />
+        <XStack items="center" gap="$2">
+          <PrivacyToggle />
+          <LanguageToggle />
+        </XStack>
       </XStack>
 
       {media.md ? (

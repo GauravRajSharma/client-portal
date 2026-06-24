@@ -14,6 +14,7 @@ import {
 } from "@tamagui/lucide-icons";
 import { Text, XStack, YStack } from "tamagui";
 import { trpc } from "@/utils/trpc";
+import { maskValue, usePrivacy } from "@/utils/privacy";
 import type { LabResult } from "@/server/dto";
 import {
   AlertBanner,
@@ -74,6 +75,7 @@ export default function Home() {
 
   const patientQ = trpc.patient.useQuery();
   const labsQ = trpc.patientAllLabResults.useQuery();
+  const revealAll = usePrivacy((s) => s.revealAll);
 
   if (patientQ.isError || labsQ.isError) {
     return (
@@ -156,7 +158,9 @@ export default function Home() {
         <PatientMini
           initials={initialsOf(patient.name)}
           name={patient.name}
-          sub={[patient.mrn, patient.hospital?.name].filter(Boolean).join(" · ")}
+          sub={[revealAll ? patient.mrn : maskValue(patient.mrn, "mrn"), patient.hospital?.name]
+            .filter(Boolean)
+            .join(" · ")}
         />
       ) : null}
 
