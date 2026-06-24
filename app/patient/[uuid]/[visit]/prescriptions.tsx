@@ -12,10 +12,19 @@ import { trpc } from "@/utils/trpc";
  * content the browser can zoom. We inject a zoom-friendly viewport so the hospital's
  * HTML is never locked to a fixed scale.
  */
+// The hospital HTML is laid out for a fixed paper width (~A4). We treat the document
+// as that page width and fit-to-screen-width so it never looks squeezed, while staying
+// pinch/scroll zoomable for reading the fine print.
+const PAGE_WIDTH = 820;
+
+function docHtml(html: string): string {
+  // Drop any viewport the source set, then impose a page-width, zoomable one.
+  const cleaned = html.replace(/<meta[^>]*name=["']?viewport["']?[^>]*>/gi, "");
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=${PAGE_WIDTH}, user-scalable=yes"><style>html,body{margin:0;padding:8px;background:#fff;-webkit-text-size-adjust:100%}img,table{max-width:100%}</style></head><body>${cleaned}</body></html>`;
+}
+
 function HtmlDoc({ html }: { html: string }) {
-  const withZoom = html.includes("user-scalable")
-    ? html
-    : `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=6, user-scalable=yes">${html}`;
+  const withZoom = docHtml(html);
 
   if (Platform.OS !== "web") {
     const { WebView } = require("react-native-webview");
@@ -31,10 +40,19 @@ function HtmlDoc({ html }: { html: string }) {
       />
     );
   }
+  // Web: render at the page width and scale the whole document down to fit the
+  // container, so an A4 layout fills the width instead of being cramped. The user
+  // can still zoom with the browser. We use an iframe sized to PAGE_WIDTH and CSS-scale.
   return (
     <iframe
       srcDoc={withZoom}
-      style={{ border: "none", width: "100%", height: "100%", background: "#fff", display: "block" }}
+      style={{
+        border: "none",
+        width: "100%",
+        height: "100%",
+        background: "#fff",
+        display: "block",
+      }}
       title="Document"
     />
   );
