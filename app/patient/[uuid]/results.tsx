@@ -6,6 +6,7 @@ import { trpc } from "@/utils/trpc";
 import type { LabResult } from "@/server/dto";
 import {
   DLScreen,
+  DLTitle,
   DeptChips,
   EmptyState,
   ErrorState,
@@ -48,6 +49,7 @@ export default function Results() {
 
   return (
     <DLScreen>
+      <DLTitle title="Results" subtitle="Your lab tests, newest first." />
       <XStack
         items="center"
         gap="$2.5"
