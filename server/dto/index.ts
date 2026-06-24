@@ -252,6 +252,12 @@ export interface CareStatus {
   steps: CareStep[];
   /** how many items are still pending, by service */
   pending: { lab: number; radiology: number; procedure: number; medication: number };
+  /** live admission context (patient-scoped) — present while currently admitted */
+  live?: {
+    isWard?: boolean;
+    /** current inpatient location / ward, e.g. "Inpatient (IPD)" */
+    ward?: string;
+  };
 }
 
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";

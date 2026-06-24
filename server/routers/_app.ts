@@ -746,6 +746,7 @@ export const appRouter = router({
             since: open.create_date ? String(open.create_date).replace(" ", "T") : undefined,
             steps: [],
             pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
+            live: await fetchLiveContext(ctx),
         };
 
         try {
@@ -993,6 +994,31 @@ async function fetchRawVisits(
             ...(externalUuid ? { limit: 1 } : {}),
         },
     });
+}
+
+/**
+ * Live admission context, patient-scoped via the bridge inpatient-admissions view
+ * (`?patients={uuid}`). A row with no stopDatetime means the patient is currently
+ * admitted. (The active-visits board is a today-only staff board that does not reliably
+ * include the patient, so it is deliberately not used.) Best-effort -> undefined.
+ */
+async function fetchLiveContext(
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
+): Promise<CareStatus["live"]> {
+    try {
+        const ia = await ctx.clients.BridgeApi<any>(
+            `/views/inpatient-admissions?patients=${ctx.auth.uuid}`,
+        );
+        const rows: any[] = Array.isArray(ia) ? ia : (ia?.results ?? ia?.data ?? []);
+        const current = rows.find((r) => !r?.visit?.stopDatetime);
+        if (!current) return undefined;
+        return {
+            isWard: true,
+            ward: current.currentInpatientLocation?.display ?? current.visit?.location?.display ?? undefined,
+        };
+    } catch {
+        return undefined;
+    }
 }
 
 /** Patient-friendly labels for the care-journey steps from the bridge throughput model. */

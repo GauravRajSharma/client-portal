@@ -2,7 +2,16 @@
  * "Care in progress" panel — a read-only, ride-share-style live view of where the
  * patient is in their current hospital visit. Driven by CareStatus (see server/dto).
  */
-import { Check, ChevronRight, FlaskConical, Pill, Radiation, Stethoscope } from "@tamagui/lucide-icons";
+import {
+  BedDouble,
+  Check,
+  ChevronRight,
+  FlaskConical,
+  Pill,
+  Radiation,
+  Stethoscope,
+} from "@tamagui/lucide-icons";
+import type { NamedExoticComponent } from "react";
 import { ScrollView, Text, XStack, YStack } from "tamagui";
 import type { CareStatus, CareStep } from "@/server/dto";
 
@@ -82,6 +91,27 @@ export function CarePending({ pending }: { pending: CareStatus["pending"] }) {
   );
 }
 
+function LiveChip({ Icon, label }: { Icon: NamedExoticComponent<any>; label: string }) {
+  return (
+    <XStack items="center" gap="$1.5" bg="$primarySoft" px="$2.5" py="$1.5" rounded={20}>
+      <Icon size={13} color="$primary" />
+      <Text fontSize={11.5} fontWeight="600" color="$primary">
+        {label}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Admitted / ward chip from the patient-scoped inpatient-admissions view. */
+export function CareLive({ live }: { live: NonNullable<CareStatus["live"]> }) {
+  if (!live.isWard) return null;
+  return (
+    <XStack gap="$2" flexWrap="wrap">
+      <LiveChip Icon={BedDouble} label={live.ward ? `Admitted · ${live.ward}` : "Admitted to ward"} />
+    </XStack>
+  );
+}
+
 const WORKFLOW_LABEL: Record<string, string> = {
   opd: "Outpatient",
   ipd: "Inpatient",
@@ -137,6 +167,7 @@ export function CareCard({ care, onPress }: { care: CareStatus; onPress?: () => 
         </YStack>
       ) : null}
 
+      {care.live ? <CareLive live={care.live} /> : null}
       <CareStepper steps={care.steps} />
       <CarePending pending={care.pending} />
     </YStack>
