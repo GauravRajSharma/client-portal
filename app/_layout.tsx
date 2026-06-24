@@ -25,28 +25,36 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { PortalProvider } from "tamagui";
 
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { QueryClientProvider } from "@tanstack/react-query";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
-import { asyncStoragePersister } from "@/utils/mmkv";
+import { persister, webNoPersist } from "@/utils/mmkv";
 import { usePrivacy } from "@/utils/privacy";
+import { authClient } from "@/utils/authClient";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+const WEEK = 1000 * 60 * 60 * 24 * 7;
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 0,
+      // Recent data revalidates on view; older history stays served from the
+      // on-device cache (and persists ~30 days on native — see persistOptions).
+      staleTime: 1000 * 60 * 5,
+      gcTime: WEEK * 4,
     },
   },
   queryCache: new QueryCache({
-    onError(error, query) {
+    onError(error) {
       if ("data" in error) {
         const data = error.data as { code: string };
-
-        if (data.code === "UNAUTHORIZED") return router.replace("/auth/login");
-
+        // Auth is handled by the route guards (index / Protected); don't force-redirect
+        // here, or a missing hospital token would override the app-account picker.
+        if (data.code === "UNAUTHORIZED") return;
         return Alert.alert("Error Occurred:", error.message);
       }
     },
@@ -55,8 +63,7 @@ const queryClient = new QueryClient({
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      fetch(url, options) {
-        console.log({ url });
+      fetch(url: any, options: any) {
         return fetch(url, options);
       },
       url: Platform.select({
@@ -68,10 +75,16 @@ const trpcClient = trpc.createClient({
       // You can pass any HTTP headers you wish here
       async headers() {
         const token = await AsyncStorage.getItem("access:token");
-
-        return {
-          authorization: token ?? "no-token",
-        };
+        const h: Record<string, string> = { authorization: token ?? "no-token" };
+        // Web sends the Better Auth session cookie automatically (same-origin).
+        // Native has no cookie jar, so attach it from the Expo auth client.
+        if (Platform.OS !== "web") {
+          try {
+            const cookie = authClient.getCookie();
+            if (cookie) h.Cookie = cookie;
+          } catch {}
+        }
+        return h;
       },
     }),
   ],
@@ -103,22 +116,32 @@ export default function RootLayout() {
     return null;
   }
 
+  const app = (
+    <TamaguiProvider config={tamaguiConfig}>
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+          <PortalProvider>
+            <Stack screenOptions={{ headerShown: false }} />
+          </PortalProvider>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </TamaguiProvider>
+  );
+
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <PersistQueryClientProvider
-        persistOptions={{ persister: asyncStoragePersister }}
-        client={queryClient}
-      >
-        <TamaguiProvider config={tamaguiConfig}>
-          <SafeAreaProvider>
-            <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-              <PortalProvider>
-                <Stack screenOptions={{ headerShown: false }} />
-              </PortalProvider>
-            </SafeAreaView>
-          </SafeAreaProvider>
-        </TamaguiProvider>
-      </PersistQueryClientProvider>
+      {webNoPersist || !persister ? (
+        // Web: never persist clinical data — always fetch.
+        <QueryClientProvider client={queryClient}>{app}</QueryClientProvider>
+      ) : (
+        // Native: persist the cache to on-device SQLite (history kept ~30 days).
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{ persister, maxAge: WEEK * 4 }}
+        >
+          {app}
+        </PersistQueryClientProvider>
+      )}
     </trpc.Provider>
   );
 }

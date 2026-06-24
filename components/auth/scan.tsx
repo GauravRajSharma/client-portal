@@ -9,11 +9,11 @@ import { Button, Paragraph, Text, XStack, YStack } from "tamagui";
 function OrDivider() {
   return (
     <XStack items="center" gap="$3" my="$1">
-      <YStack flex={1} height={1} bg="$borderColor" />
-      <Text fontSize="$2" fontWeight="600" color="$color9" letterSpacing={0.6}>
-        OR
+      <YStack flex={1} height={1} bg="$border" />
+      <Text fontSize={12} fontWeight="600" color="$text3" letterSpacing={0.6}>
+        or
       </Text>
-      <YStack flex={1} height={1} bg="$borderColor" />
+      <YStack flex={1} height={1} bg="$border" />
     </XStack>
   );
 }
@@ -56,35 +56,38 @@ export function ScanVisitTicket({
 
   return (
     <React.Fragment>
-      <YStack gap="$3.5">
+      <YStack gap="$2.5">
         <OrDivider />
 
-        <Button
-          height={52}
-          rounded="$5"
-          bg="$color1"
+        <XStack
+          items="center"
+          gap="$3"
+          height={60}
+          rounded={14}
+          bg="$surface"
           borderWidth={1}
-          borderColor="$borderColor"
-          hoverStyle={{ bg: "$color2", borderColor: "$borderColorHover" }}
-          pressStyle={{ bg: "$color3" }}
-          icon={<QrCode size={20} color="$color11" />}
+          borderColor="$border"
+          px="$3.5"
+          pressStyle={{ opacity: 0.8 }}
           onPress={openScanner}
           accessibilityRole="button"
           accessibilityLabel="Scan the QR code on your visit ticket"
         >
-          <Button.Text fontSize="$4" fontWeight="700" color="$color12">
-            Scan your visit ticket
-          </Button.Text>
-        </Button>
-
-        {permission && !permission.granted ? (
-          <XStack items="center" gap="$2" px="$1">
-            <Camera size={15} color="$color10" />
-            <Text fontSize="$2" color="$color11" flex={1}>
-              We ask for camera access only to read the ticket QR code.
+          <YStack width={40} height={40} rounded={11} bg="$primarySoft" items="center" justify="center">
+            <QrCode size={21} color="$primary" />
+          </YStack>
+          <YStack flex={1} minW={0}>
+            <Text fontSize={14.5} fontWeight="700" color="$color12">
+              Scan your visit ticket
             </Text>
-          </XStack>
-        ) : null}
+            <Text fontSize={12} color="$text2">
+              {permission && !permission.granted
+                ? "Camera is used only to read the QR code"
+                : "Auto-fills your MRN from the ticket QR"}
+            </Text>
+          </YStack>
+          <ScanLine size={20} color="$text3" />
+        </XStack>
       </YStack>
 
       {showCamera ? (

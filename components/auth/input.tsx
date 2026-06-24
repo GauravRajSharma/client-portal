@@ -93,7 +93,8 @@ const FocusContext = createStyledContext({
   focused: false,
 });
 
-const InputGroupImpl = InputGroupFrame.styleable((props, forwardedRef) => {
+// @ts-ignore Tamagui styleable render-fn typing friction under React 19 types
+const InputGroupImpl = InputGroupFrame.styleable((props: any, forwardedRef: any) => {
   const { children, ...rest } = props;
   const [focused, setFocused] = useState(false);
 
@@ -132,7 +133,8 @@ const InputFrame = styled(TInput, {
   context: InputContext,
 });
 
-const InputImpl = InputFrame.styleable((props, ref) => {
+// @ts-ignore Tamagui styleable render-fn typing friction under React 19 types
+const InputImpl = InputFrame.styleable((props: any, ref: any) => {
   const { setFocused } = FocusContext.useStyledContext();
   const { size } = InputContext.useStyledContext();
   const { ...rest } = props;
@@ -196,7 +198,8 @@ const getIconSize = (size: FontSizeTokens, scale: number) => {
 const InputIcon = InputIconFrame.styleable<{
   scaleIcon?: number;
   color?: ColorTokens | string;
-}>((props, ref) => {
+  // @ts-ignore Tamagui styleable render-fn typing friction under React 19 types
+}>((props: any, ref: any) => {
   const { children, color: colorProp, ...rest } = props;
   const inputContext = InputContext.useStyledContext();
   const { size = "$true", color: contextColor, scaleIcon = 1 } = inputContext;

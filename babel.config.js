@@ -12,8 +12,8 @@ module.exports = (api) => {
         },
       ],
 
-      // NOTE: this is only necessary if you are using reanimated for animations
-      "react-native-reanimated/plugin",
+      // Reanimated v4 (SDK 54) moved its Babel plugin into react-native-worklets.
+      "react-native-worklets/plugin",
       "@babel/plugin-transform-class-static-block",
     ],
   };

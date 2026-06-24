@@ -8,6 +8,7 @@ import { TActiveMedicationOrder } from "../types/initial";
 import { clean, toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
 import { ttlCache } from "../lib/cache";
 import { rateLimit } from "../lib/ratelimit";
+import { authDb } from "../auth";
 import {
     findStudyUid,
     isPacsModality,
@@ -114,16 +115,27 @@ type TAuthData = {
     server: string;
 };
 
+type AppUser = { id: string; email: string; name?: string };
+
 const t = initTRPC
     .context<{
         token?: string;
         ip?: string;
+        appUser?: AppUser | null;
         auth?: TAuthData | null;
         clients?: ReturnType<typeof createClients>;
     }>()
     .create();
 
 export const publicProcedure = t.procedure;
+
+/** Requires a Better Auth app-account session (the thin accounts layer). */
+const appProcedure = t.procedure.use((opts) => {
+    if (!opts.ctx.appUser) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to your app account." });
+    }
+    return opts.next({ ctx: { appUser: opts.ctx.appUser } });
+});
 
 const protectedProcedure = t.procedure.use(async (opts) => {
     try {
@@ -313,6 +325,109 @@ export const appRouter = router({
                 );
                 return perHospital.filter((x): x is BedAvailability => x !== null);
             });
+        }),
+
+    /* ---- Thin accounts layer: link / list / enter / unlink hospital records ---- */
+
+    /** Link a just-verified hospital record (its access token) to the app account. */
+    linkHospital: appProcedure
+        .input(z.object({ accessToken: z.string() }))
+        .mutation(({ ctx, input }) => {
+            let payload: any;
+            try {
+                payload = jwt.verify(input.accessToken, JWT_VERIFICATION_KEY);
+            } catch {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid hospital token." });
+            }
+            const { uuid, name, ref, server } = payload ?? {};
+            if (!uuid || !server) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Incomplete hospital token." });
+            }
+            authDb
+                .prepare(
+                    `INSERT INTO hospital_link (id, userId, server, uuid, name, ref, createdAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(userId, server, uuid) DO UPDATE SET name = excluded.name, ref = excluded.ref`,
+                )
+                .run(
+                    globalThis.crypto.randomUUID(),
+                    ctx.appUser!.id,
+                    String(server),
+                    String(uuid),
+                    name ? String(name) : null,
+                    ref ? String(ref) : null,
+                    Date.now(),
+                );
+            return { ok: true };
+        }),
+
+    /** The app account's linked hospitals (with display names). */
+    myHospitals: appProcedure.query(async ({ ctx }) => {
+        const rows = authDb
+            .prepare(
+                `SELECT server, uuid, name, ref, createdAt FROM hospital_link WHERE userId = ? ORDER BY createdAt DESC`,
+            )
+            .all(ctx.appUser!.id) as {
+            server: string;
+            uuid: string;
+            name: string | null;
+            ref: string | null;
+            createdAt: number;
+        }[];
+
+        return Promise.all(
+            rows.map(async (r) => {
+                let hospitalName: string | undefined;
+                try {
+                    const erp = createERPClient({ BASE_URL: `http://${r.server}.netbird.selfhosted` });
+                    const h = await erp<{ name: string }>("api/hospital");
+                    hospitalName = h?.name;
+                } catch {
+                    hospitalName = undefined;
+                }
+                const prefix =
+                    hospitals.find((h) => h.server === r.server)?.prefix ?? r.server.toUpperCase();
+                return {
+                    server: r.server,
+                    uuid: r.uuid,
+                    name: r.name ?? undefined,
+                    ref: r.ref ?? undefined,
+                    hospitalName,
+                    prefix,
+                };
+            }),
+        );
+    }),
+
+    /** Re-mint the per-hospital access token for a linked record (to enter the portal). */
+    enterHospital: appProcedure
+        .input(z.object({ server: z.string(), uuid: z.string() }))
+        .mutation(({ ctx, input }) => {
+            const row = authDb
+                .prepare(
+                    `SELECT server, uuid, name, ref FROM hospital_link WHERE userId = ? AND server = ? AND uuid = ?`,
+                )
+                .get(ctx.appUser!.id, input.server, input.uuid) as
+                | { server: string; uuid: string; name: string | null; ref: string | null }
+                | undefined;
+            if (!row) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not linked to your account." });
+            }
+            const accessToken = jwt.sign(
+                { uuid: row.uuid, name: row.name, ref: row.ref, server: row.server },
+                JWT_VERIFICATION_KEY,
+            );
+            return { uuid: row.uuid, accessToken };
+        }),
+
+    /** Remove a hospital link from the app account. */
+    unlinkHospital: appProcedure
+        .input(z.object({ server: z.string(), uuid: z.string() }))
+        .mutation(({ ctx, input }) => {
+            authDb
+                .prepare(`DELETE FROM hospital_link WHERE userId = ? AND server = ? AND uuid = ?`)
+                .run(ctx.appUser!.id, input.server, input.uuid);
+            return { ok: true };
         }),
 
     verify: publicProcedure
