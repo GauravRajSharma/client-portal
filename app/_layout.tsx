@@ -55,8 +55,7 @@ const queryClient = new QueryClient({
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      fetch(url, options) {
-        console.log({ url });
+      fetch(url: any, options: any) {
         return fetch(url, options);
       },
       url: Platform.select({

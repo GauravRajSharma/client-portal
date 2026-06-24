@@ -49,12 +49,9 @@ function AuthBrand() {
         <Text fontSize={25} fontWeight="700" color="$color12" letterSpacing={-0.5}>
           EHRPlus
         </Text>
-        <XStack items="center" gap="$1.5">
-          <MapPin size={14} color="$primary" />
-          <Text fontSize={13.5} fontWeight="600" color="$primary">
-            WHO Nepal · Patient Portal
-          </Text>
-        </XStack>
+        <Text fontSize={13.5} fontWeight="600" color="$primary">
+          Patient Portal
+        </Text>
       </YStack>
     </YStack>
   );

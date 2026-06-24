@@ -4941,14 +4941,14 @@ var require_UI = __commonJS({
         onWheelCapture: nothing,
         onTouchMoveCapture: nothing
       }), callbacks = _a[0], setCallbacks = _a[1];
-      var forwardProps = props.forwardProps, children = props.children, className = props.className, removeScrollBar = props.removeScrollBar, enabled = props.enabled, shards = props.shards, sideCar = props.sideCar, noIsolation = props.noIsolation, inert = props.inert, allowPinchZoom = props.allowPinchZoom, _b = props.as, Container = _b === void 0 ? "div" : _b, gapMode = props.gapMode, rest = tslib_1.__rest(props, ["forwardProps", "children", "className", "removeScrollBar", "enabled", "shards", "sideCar", "noIsolation", "inert", "allowPinchZoom", "as", "gapMode"]);
+      var forwardProps = props.forwardProps, children = props.children, className = props.className, removeScrollBar = props.removeScrollBar, enabled = props.enabled, shards = props.shards, sideCar = props.sideCar, noRelative = props.noRelative, noIsolation = props.noIsolation, inert = props.inert, allowPinchZoom = props.allowPinchZoom, _b = props.as, Container = _b === void 0 ? "div" : _b, gapMode = props.gapMode, rest = tslib_1.__rest(props, ["forwardProps", "children", "className", "removeScrollBar", "enabled", "shards", "sideCar", "noRelative", "noIsolation", "inert", "allowPinchZoom", "as", "gapMode"]);
       var SideCar = sideCar;
       var containerRef = (0, use_callback_ref_1.useMergeRefs)([ref, parentRef]);
       var containerProps = tslib_1.__assign(tslib_1.__assign({}, rest), callbacks);
       return React84.createElement(
         React84.Fragment,
         null,
-        enabled && React84.createElement(SideCar, { sideCar: medium_1.effectCar, removeScrollBar, shards, noIsolation, inert, setCallbacks, allowPinchZoom: !!allowPinchZoom, lockRef: ref, gapMode }),
+        enabled && React84.createElement(SideCar, { sideCar: medium_1.effectCar, removeScrollBar, shards, noRelative, noIsolation, inert, setCallbacks, allowPinchZoom: !!allowPinchZoom, lockRef: ref, gapMode }),
         forwardProps ? React84.cloneElement(React84.Children.only(children), tslib_1.__assign(tslib_1.__assign({}, containerProps), { ref: containerRef })) : React84.createElement(Container, tslib_1.__assign({}, containerProps, { className, ref: containerRef }), children)
       );
     });
@@ -5342,6 +5342,9 @@ var require_handleScroll = __commonJS({
       var availableScroll = 0;
       var availableScrollTop = 0;
       do {
+        if (!target) {
+          break;
+        }
         var _a = getScrollVariables(axis, target), position = _a[0], scroll_1 = _a[1], capacity = _a[2];
         var elementScroll = scroll_1 - capacity - directionFactor * position;
         if (position || elementScroll) {
@@ -5350,11 +5353,8 @@ var require_handleScroll = __commonJS({
             availableScrollTop += position;
           }
         }
-        if (target instanceof ShadowRoot) {
-          target = target.host;
-        } else {
-          target = target.parentNode;
-        }
+        var parent_1 = target.parentNode;
+        target = parent_1 && parent_1.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? parent_1.host : parent_1;
       } while (
         // portaled content
         !targetInLock && target !== document.body || // self content
@@ -5440,6 +5440,12 @@ var require_SideEffect = __commonJS({
         var target = event.target;
         var moveDirection = Math.abs(deltaX) > Math.abs(deltaY) ? "h" : "v";
         if ("touches" in event && moveDirection === "h" && target.type === "range") {
+          return false;
+        }
+        var selection = window.getSelection();
+        var anchorNode = selection && selection.anchorNode;
+        var isTouchingSelection = anchorNode ? anchorNode === target || anchorNode.contains(target) : false;
+        if (isTouchingSelection) {
           return false;
         }
         var canBeScrolledInMainDirection = (0, handleScroll_1.locationCouldBeScrolled)(moveDirection, target);
@@ -5534,7 +5540,7 @@ var require_SideEffect = __commonJS({
         React84.Fragment,
         null,
         inert ? React84.createElement(Style, { styles: generateStyle(id) }) : null,
-        removeScrollBar ? React84.createElement(react_remove_scroll_bar_1.RemoveScrollBar, { gapMode: props.gapMode }) : null
+        removeScrollBar ? React84.createElement(react_remove_scroll_bar_1.RemoveScrollBar, { noRelative: props.noRelative, gapMode: props.gapMode }) : null
       );
     }
     __name(RemoveScrollSideCar, "RemoveScrollSideCar");
@@ -6949,21 +6955,6 @@ var require_createPrefixer = __commonJS({
   }
 });
 
-// node_modules/inline-style-prefixer/lib/plugins/backgroundClip.js
-var require_backgroundClip = __commonJS({
-  "node_modules/inline-style-prefixer/lib/plugins/backgroundClip.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", {
-      value: true
-    });
-    exports2.default = backgroundClip;
-    function backgroundClip() {
-      return null;
-    }
-    __name(backgroundClip, "backgroundClip");
-  }
-});
-
 // node_modules/css-in-js-utils/lib/assignStyle.js
 var require_assignStyle = __commonJS({
   "node_modules/css-in-js-utils/lib/assignStyle.js"(exports2) {
@@ -7428,54 +7419,6 @@ var require_crossFade = __commonJS({
   }
 });
 
-// node_modules/inline-style-prefixer/lib/plugins/cursor.js
-var require_cursor = __commonJS({
-  "node_modules/inline-style-prefixer/lib/plugins/cursor.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", {
-      value: true
-    });
-    exports2.default = cursor;
-    var prefixes = ["-webkit-", "-moz-", ""];
-    var values = {
-      "zoom-in": true,
-      "zoom-out": true,
-      grab: true,
-      grabbing: true
-    };
-    function cursor(property, value) {
-      if (property === "cursor" && values.hasOwnProperty(value)) {
-        return prefixes.map(function(prefix) {
-          return prefix + value;
-        });
-      }
-    }
-    __name(cursor, "cursor");
-  }
-});
-
-// node_modules/inline-style-prefixer/lib/plugins/filter.js
-var require_filter = __commonJS({
-  "node_modules/inline-style-prefixer/lib/plugins/filter.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", {
-      value: true
-    });
-    exports2.default = filter;
-    var _cssInJsUtils = require_lib();
-    var FILTER_REGEX = /filter\(/g;
-    var prefixes = ["-webkit-", ""];
-    function filter(property, value) {
-      if (typeof value === "string" && !(0, _cssInJsUtils.isPrefixedValue)(value) && value.indexOf("filter(") !== -1) {
-        return prefixes.map(function(prefix) {
-          return value.replace(FILTER_REGEX, prefix + "filter(");
-        });
-      }
-    }
-    __name(filter, "filter");
-  }
-});
-
 // node_modules/inline-style-prefixer/lib/plugins/imageSet.js
 var require_imageSet = __commonJS({
   "node_modules/inline-style-prefixer/lib/plugins/imageSet.js"(exports2) {
@@ -7685,10 +7628,7 @@ var require_static = __commonJS({
     var _interopRequireDefault = require_interopRequireDefault().default;
     exports2.__esModule = true;
     exports2.default = void 0;
-    var _backgroundClip = _interopRequireDefault(require_backgroundClip());
     var _crossFade = _interopRequireDefault(require_crossFade());
-    var _cursor = _interopRequireDefault(require_cursor());
-    var _filter = _interopRequireDefault(require_filter());
     var _imageSet = _interopRequireDefault(require_imageSet());
     var _logical = _interopRequireDefault(require_logical());
     var _position = _interopRequireDefault(require_position());
@@ -7700,7 +7640,7 @@ var require_static = __commonJS({
     var wms = ["Webkit", "ms"];
     var wmms = ["Webkit", "Moz", "ms"];
     var _default = exports2.default = {
-      plugins: [_backgroundClip.default, _crossFade.default, _cursor.default, _filter.default, _imageSet.default, _logical.default, _position.default, _sizing.default, _transition.default],
+      plugins: [_crossFade.default, _imageSet.default, _logical.default, _position.default, _sizing.default, _transition.default],
       prefixMap: {
         appearance: wmms,
         userSelect: wm,
@@ -8076,29 +8016,34 @@ var require_compiler = __commonJS({
         }
         // Polyfill for additional 'pointer-events' values
         // See d13f78622b233a0afc0c7a200c0a0792c8ca9e58
+        // See https://reactnative.dev/docs/view#pointerevents
         case "pointerEvents": {
           var finalValue = value;
-          if (value === "auto" || value === "box-only") {
+          if (value === "auto") {
             finalValue = "auto!important";
-            if (value === "box-only") {
-              var _block2 = createDeclarationBlock({
-                pointerEvents: "none"
-              });
-              rules.push(selector + ">*" + _block2);
-            }
-          } else if (value === "none" || value === "box-none") {
+          } else if (value === "none") {
             finalValue = "none!important";
-            if (value === "box-none") {
-              var _block3 = createDeclarationBlock({
-                pointerEvents: "auto"
-              });
-              rules.push(selector + ">*" + _block3);
-            }
+            var _block2 = createDeclarationBlock({
+              pointerEvents: "none"
+            });
+            rules.push(selector + ">* " + _block2);
+          } else if (value === "box-none") {
+            finalValue = "none!important";
+            var _block3 = createDeclarationBlock({
+              pointerEvents: "auto"
+            });
+            rules.push(selector + ">* " + _block3);
+          } else if (value === "box-only") {
+            finalValue = "auto!important";
+            var _block4 = createDeclarationBlock({
+              pointerEvents: "none"
+            });
+            rules.push(selector + ">* " + _block4);
           }
-          var _block4 = createDeclarationBlock({
+          var _block5 = createDeclarationBlock({
             pointerEvents: finalValue
           });
-          rules.push("" + selector + _block4);
+          rules.push("" + selector + _block5);
           break;
         }
         // Polyfill for draft spec
@@ -8107,17 +8052,17 @@ var require_compiler = __commonJS({
           if (value === "none") {
             rules.push(selector + "::-webkit-scrollbar{display:none}");
           }
-          var _block5 = createDeclarationBlock({
+          var _block6 = createDeclarationBlock({
             scrollbarWidth: value
           });
-          rules.push("" + selector + _block5);
+          rules.push("" + selector + _block6);
           break;
         }
         default: {
-          var _block6 = createDeclarationBlock({
+          var _block7 = createDeclarationBlock({
             [property]: value
           });
-          rules.push("" + selector + _block6);
+          rules.push("" + selector + _block7);
           break;
         }
       }
@@ -8498,7 +8443,7 @@ var require_preprocess = __commonJS({
     "use strict";
     var _interopRequireDefault = require_interopRequireDefault().default;
     exports2.__esModule = true;
-    exports2.preprocess = exports2.default = exports2.createTransformValue = exports2.createTextShadowValue = exports2.createBoxShadowValue = void 0;
+    exports2.preprocess = exports2.default = exports2.createTransformValue = exports2.createTransformOriginValue = exports2.createTextShadowValue = exports2.createBoxShadowValue = exports2.createBoxShadowArrayValue = void 0;
     var _normalizeColor = _interopRequireDefault(require_normalizeColor());
     var _normalizeValueWithProperty = _interopRequireDefault(require_normalizeValueWithProperty());
     var _warnOnce = require_warnOnce();
@@ -8532,6 +8477,22 @@ var require_preprocess = __commonJS({
       }
     }, "createTextShadowValue");
     exports2.createTextShadowValue = createTextShadowValue;
+    var mapBoxShadow = /* @__PURE__ */ __name((boxShadow) => {
+      if (typeof boxShadow === "string") {
+        return boxShadow;
+      }
+      var offsetX = (0, _normalizeValueWithProperty.default)(boxShadow.offsetX) || 0;
+      var offsetY = (0, _normalizeValueWithProperty.default)(boxShadow.offsetY) || 0;
+      var blurRadius = (0, _normalizeValueWithProperty.default)(boxShadow.blurRadius) || 0;
+      var spreadDistance = (0, _normalizeValueWithProperty.default)(boxShadow.spreadDistance) || 0;
+      var color = (0, _normalizeColor.default)(boxShadow.color) || "black";
+      var position = boxShadow.inset ? "inset " : "";
+      return "" + position + offsetX + " " + offsetY + " " + blurRadius + " " + spreadDistance + " " + color;
+    }, "mapBoxShadow");
+    var createBoxShadowArrayValue = /* @__PURE__ */ __name((value) => {
+      return value.map(mapBoxShadow).join(", ");
+    }, "createBoxShadowArrayValue");
+    exports2.createBoxShadowArrayValue = createBoxShadowArrayValue;
     var mapTransform = /* @__PURE__ */ __name((transform) => {
       var type = Object.keys(transform)[0];
       var value = transform[type];
@@ -8546,6 +8507,10 @@ var require_preprocess = __commonJS({
       return value.map(mapTransform).join(" ");
     }, "createTransformValue");
     exports2.createTransformValue = createTransformValue;
+    var createTransformOriginValue = /* @__PURE__ */ __name((value) => {
+      return value.map((v) => (0, _normalizeValueWithProperty.default)(v)).join(" ");
+    }, "createTransformOriginValue");
+    exports2.createTransformOriginValue = createTransformOriginValue;
     var PROPERTIES_STANDARD = {
       borderBottomEndRadius: "borderEndEndRadius",
       borderBottomStartRadius: "borderEndStartRadius",
@@ -8583,10 +8548,8 @@ var require_preprocess = __commonJS({
       if (options.shadow === true, style.shadowColor != null || style.shadowOffset != null || style.shadowOpacity != null || style.shadowRadius != null) {
         (0, _warnOnce.warnOnce)("shadowStyles", '"shadow*" style props are deprecated. Use "boxShadow".');
         var boxShadowValue = createBoxShadowValue(style);
-        if (boxShadowValue != null && nextStyle.boxShadow == null) {
-          var boxShadow = style.boxShadow;
-          var value = boxShadow ? boxShadow + ", " + boxShadowValue : boxShadowValue;
-          nextStyle.boxShadow = value;
+        if (boxShadowValue != null) {
+          nextStyle.boxShadow = boxShadowValue;
         }
       }
       if (options.textShadow === true, style.textShadowColor != null || style.textShadowOffset != null || style.textShadowRadius != null) {
@@ -8594,8 +8557,8 @@ var require_preprocess = __commonJS({
         var textShadowValue = createTextShadowValue(style);
         if (textShadowValue != null && nextStyle.textShadow == null) {
           var textShadow = style.textShadow;
-          var _value = textShadow ? textShadow + ", " + textShadowValue : textShadowValue;
-          nextStyle.textShadow = _value;
+          var value = textShadow ? textShadow + ", " + textShadowValue : textShadowValue;
+          nextStyle.textShadow = value;
         }
       }
       for (var originalProp in style) {
@@ -8607,28 +8570,39 @@ var require_preprocess = __commonJS({
         }
         var originalValue = style[originalProp];
         var prop = PROPERTIES_STANDARD[originalProp] || originalProp;
-        var _value2 = originalValue;
+        var _value = originalValue;
         if (!Object.prototype.hasOwnProperty.call(style, originalProp) || prop !== originalProp && style[prop] != null) {
           continue;
         }
-        if (prop === "aspectRatio" && typeof _value2 === "number") {
-          nextStyle[prop] = _value2.toString();
-        } else if (prop === "fontVariant") {
-          if (Array.isArray(_value2) && _value2.length > 0) {
-            _value2 = _value2.join(" ");
+        if (prop === "aspectRatio" && typeof _value === "number") {
+          nextStyle[prop] = _value.toString();
+        } else if (prop === "boxShadow") {
+          if (Array.isArray(_value)) {
+            _value = createBoxShadowArrayValue(_value);
           }
-          nextStyle[prop] = _value2;
+          var boxShadow = nextStyle.boxShadow;
+          nextStyle.boxShadow = boxShadow ? _value + ", " + boxShadow : _value;
+        } else if (prop === "fontVariant") {
+          if (Array.isArray(_value) && _value.length > 0) {
+            _value = _value.join(" ");
+          }
+          nextStyle[prop] = _value;
         } else if (prop === "textAlignVertical") {
           if (style.verticalAlign == null) {
-            nextStyle.verticalAlign = _value2 === "center" ? "middle" : _value2;
+            nextStyle.verticalAlign = _value === "center" ? "middle" : _value;
           }
         } else if (prop === "transform") {
-          if (Array.isArray(_value2)) {
-            _value2 = createTransformValue(_value2);
+          if (Array.isArray(_value)) {
+            _value = createTransformValue(_value);
           }
-          nextStyle.transform = _value2;
+          nextStyle.transform = _value;
+        } else if (prop === "transformOrigin") {
+          if (Array.isArray(_value)) {
+            _value = createTransformOriginValue(_value);
+          }
+          nextStyle.transformOrigin = _value;
         } else {
-          nextStyle[prop] = _value2;
+          nextStyle[prop] = _value;
         }
       }
       return nextStyle;
@@ -9933,28 +9907,10 @@ var require_findNodeHandle = __commonJS({
     "use strict";
     exports2.__esModule = true;
     exports2.default = void 0;
-    var _reactDom = require("react-dom");
     var findNodeHandle = /* @__PURE__ */ __name((component) => {
-      var node;
-      try {
-        node = (0, _reactDom.findDOMNode)(component);
-      } catch (e) {
-      }
-      return node;
+      throw new Error("findNodeHandle is not supported on web. Use the ref property on the component instead.");
     }, "findNodeHandle");
     var _default = exports2.default = findNodeHandle;
-    module2.exports = exports2.default;
-  }
-});
-
-// node_modules/react-native-web/dist/cjs/exports/unmountComponentAtNode/index.js
-var require_unmountComponentAtNode = __commonJS({
-  "node_modules/react-native-web/dist/cjs/exports/unmountComponentAtNode/index.js"(exports2, module2) {
-    "use strict";
-    exports2.__esModule = true;
-    exports2.default = void 0;
-    var _reactDom = require("react-dom");
-    var _default = exports2.default = _reactDom.unmountComponentAtNode;
     module2.exports = exports2.default;
   }
 });
@@ -9964,15 +9920,10 @@ var require_render = __commonJS({
   "node_modules/react-native-web/dist/cjs/exports/render/index.js"(exports2) {
     "use strict";
     "use client";
-    var _interopRequireDefault = require_interopRequireDefault().default;
     exports2.__esModule = true;
-    exports2.default = renderLegacy;
+    exports2.default = render;
     exports2.hydrate = hydrate;
-    exports2.hydrateLegacy = hydrateLegacy;
-    exports2.render = render;
-    var _reactDom = require("react-dom");
     var _client = require("react-dom/client");
-    var _unmountComponentAtNode = _interopRequireDefault(require_unmountComponentAtNode());
     var _dom = require_dom();
     function hydrate(element, root) {
       (0, _dom.createSheet)(root);
@@ -9986,26 +9937,21 @@ var require_render = __commonJS({
       return reactRoot;
     }
     __name(render, "render");
-    function hydrateLegacy(element, root, callback) {
-      (0, _dom.createSheet)(root);
-      (0, _reactDom.hydrate)(element, root, callback);
-      return {
-        unmount: /* @__PURE__ */ __name(function unmount() {
-          return (0, _unmountComponentAtNode.default)(root);
-        }, "unmount")
-      };
+  }
+});
+
+// node_modules/react-native-web/dist/cjs/exports/unmountComponentAtNode/index.js
+var require_unmountComponentAtNode = __commonJS({
+  "node_modules/react-native-web/dist/cjs/exports/unmountComponentAtNode/index.js"(exports2, module2) {
+    "use strict";
+    exports2.__esModule = true;
+    exports2.default = unmountComponentAtNode;
+    function unmountComponentAtNode(rootTag) {
+      rootTag.unmount();
+      return true;
     }
-    __name(hydrateLegacy, "hydrateLegacy");
-    function renderLegacy(element, root, callback) {
-      (0, _dom.createSheet)(root);
-      (0, _reactDom.render)(element, root, callback);
-      return {
-        unmount: /* @__PURE__ */ __name(function unmount() {
-          return (0, _unmountComponentAtNode.default)(root);
-        }, "unmount")
-      };
-    }
-    __name(renderLegacy, "renderLegacy");
+    __name(unmountComponentAtNode, "unmountComponentAtNode");
+    module2.exports = exports2.default;
   }
 });
 
@@ -10421,6 +10367,9 @@ var require_Platform = __commonJS({
           return true;
         }
         return false;
+      },
+      get Version() {
+        return "0.0.0";
       }
     };
     var _default = exports2.default = Platform3;
@@ -10499,6 +10448,7 @@ var require_forwardedProps = __commonJS({
       "aria-pressed": true,
       "aria-readonly": true,
       "aria-required": true,
+      inert: true,
       role: true,
       "aria-roledescription": true,
       "aria-rowcount": true,
@@ -11868,6 +11818,7 @@ var require_View = __commonJS({
     View11.displayName = "View";
     var styles = _StyleSheet.default.create({
       view$raw: {
+        alignContent: "flex-start",
         alignItems: "stretch",
         backgroundColor: "transparent",
         border: "0 solid black",
@@ -14384,7 +14335,6 @@ var require_VirtualizedList = __commonJS({
     var _ScrollView = _interopRequireDefault(require_ScrollView());
     var _View = _interopRequireDefault(require_View());
     var _StyleSheet = _interopRequireDefault(require_StyleSheet());
-    var _findNodeHandle = _interopRequireDefault(require_findNodeHandle());
     var _Batchinator = _interopRequireDefault(require_Batchinator());
     var _clamp = _interopRequireDefault(require_clamp2());
     var _infoLog = _interopRequireDefault(require_infoLog());
@@ -17619,7 +17569,6 @@ var require_AnimatedProps = __commonJS({
         }
         this._props = props;
         this._callback = callback;
-        this.__attach();
       }
       __getValue() {
         var props = {};
@@ -17659,6 +17608,7 @@ var require_AnimatedProps = __commonJS({
         if (this.__isNative && this._animatedView) {
           this.__disconnectAnimatedView();
         }
+        this._animatedView = null;
         for (var key in this._props) {
           var value = this._props[key];
           if (value instanceof _AnimatedNode.default) {
@@ -19104,7 +19054,7 @@ var require_Text = __commonJS({
       textMultiLine: {
         display: "-webkit-box",
         maxWidth: "100%",
-        overflow: "hidden",
+        overflow: "clip",
         textOverflow: "ellipsis",
         WebkitBoxOrient: "vertical"
       },
@@ -21027,6 +20977,7 @@ var require_AnimatedImplementation = __commonJS({
             }
             current++;
             if (current === animations.length) {
+              current = 0;
               callback && callback(result);
               return;
             }
@@ -21655,8 +21606,8 @@ var require_renderApplication = __commonJS({
     var _StyleSheet = _interopRequireDefault(require_StyleSheet());
     var _react = _interopRequireDefault(require("react"));
     function renderApplication(RootComponent, WrapperComponent, callback, options) {
-      var shouldHydrate = options.hydrate, initialProps = options.initialProps, mode = options.mode, rootTag = options.rootTag;
-      var renderFn = shouldHydrate ? mode === "concurrent" ? _render.hydrate : _render.hydrateLegacy : mode === "concurrent" ? _render.render : _render.default;
+      var shouldHydrate = options.hydrate, initialProps = options.initialProps, rootTag = options.rootTag;
+      var renderFn = shouldHydrate ? _render.hydrate : _render.default;
       (0, _invariant.default)(rootTag, "Expect to have a valid rootTag, instead got ", rootTag);
       return renderFn(/* @__PURE__ */ _react.default.createElement(_AppContainer.default, {
         WrapperComponent,
@@ -23573,7 +23524,7 @@ var require_ModalPortal = __commonJS({
     exports2.__esModule = true;
     exports2.default = void 0;
     var React84 = _interopRequireWildcard(require("react"));
-    var _reactDom = _interopRequireDefault(require("react-dom"));
+    var _reactDom = require("react-dom");
     var _canUseDom = _interopRequireDefault(require_canUseDom());
     function ModalPortal(props) {
       var children = props.children;
@@ -23595,7 +23546,7 @@ var require_ModalPortal = __commonJS({
           };
         }
       }, []);
-      return elementRef.current && _canUseDom.default ? /* @__PURE__ */ _reactDom.default.createPortal(children, elementRef.current) : null;
+      return elementRef.current && _canUseDom.default ? /* @__PURE__ */ (0, _reactDom.createPortal)(children, elementRef.current) : null;
     }
     __name(ModalPortal, "ModalPortal");
     var _default = exports2.default = ModalPortal;
@@ -23614,7 +23565,7 @@ var require_ModalAnimation = __commonJS({
     var React84 = _interopRequireWildcard(require("react"));
     var _StyleSheet = _interopRequireDefault(require_StyleSheet());
     var _createElement = _interopRequireDefault(require_createElement());
-    var ANIMATION_DURATION = 300;
+    var ANIMATION_DURATION = 250;
     function getAnimationStyle(animationType, visible) {
       if (animationType === "slide") {
         return visible ? animatedSlideInStyles : animatedSlideOutStyles;
@@ -23676,12 +23627,12 @@ var require_ModalAnimation = __commonJS({
       },
       animatedIn: {
         animationDuration: ANIMATION_DURATION + "ms",
-        animationTimingFunction: "ease-in"
+        animationTimingFunction: "cubic-bezier(0.215, 0.61, 0.355, 1)"
       },
       animatedOut: {
         pointerEvents: "none",
         animationDuration: ANIMATION_DURATION + "ms",
-        animationTimingFunction: "ease-out"
+        animationTimingFunction: "cubic-bezier(0.47, 0, 0.745, 0.715)"
       },
       fadeIn: {
         opacity: 1,
@@ -47839,8 +47790,18 @@ var monoFont = {
     700: { normal: "IBMPlexMono_600SemiBold" }
   }
 };
+var SPACE_SCALE = 0.95;
+var scaledSpace = Object.fromEntries(
+  Object.entries(defaultConfig.tokens.space).map(
+    ([k, v]) => typeof v === "number" ? [k, Math.round(v * SPACE_SCALE * 100) / 100] : [k, v]
+  )
+);
 var tamaguiConfig = createTamagui({
   ...defaultConfig,
+  tokens: {
+    ...defaultConfig.tokens,
+    space: scaledSpace
+  },
   fonts: {
     ...defaultConfig.fonts,
     heading: sansFont,

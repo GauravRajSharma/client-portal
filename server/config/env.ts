@@ -15,5 +15,13 @@ if (process.env.NODE_ENV === "production" && JWT_SECRET === DEV_FALLBACK) {
   throw new Error("JWT_SECRET must be set in production");
 }
 
+// Better Auth (thin accounts layer). Its own signing secret + the on-disk SQLite
+// path. The DB stores ONLY app users + their hospital links, never clinical data.
+export const BETTER_AUTH_SECRET: string =
+  process.env.BETTER_AUTH_SECRET ?? JWT_SECRET;
+
+export const AUTH_DB_PATH: string =
+  process.env.AUTH_DB_PATH ?? `${process.cwd()}/server/data/auth.db`;
+
 // ponytail: backend basic-auth creds are still inline in server/lib/clients.ts
 // (pre-existing). Move them here behind env vars when rotating credentials.

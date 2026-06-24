@@ -38,3 +38,6 @@ yarn-error.*
 app-example
 
 .claude/worktrees/
+
+# Better Auth SQLite (runtime data, never commit)
+server/data/
