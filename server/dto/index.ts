@@ -135,10 +135,18 @@ export interface Bill {
   /** Stable id for keys/grouping (invoice id, falls back to number). */
   id?: string;
   visitId?: string;
+  /** "invoice" (a charge) or "refund" (a reversal / money back to the patient). */
+  kind: "invoice" | "refund";
   /** Human invoice number, e.g. "INV/2026/00123". */
   number?: string;
   /** ISO/display date the invoice was issued. */
   date?: string;
+  /** Outpatient / Inpatient, from Odoo care_type (O/I). */
+  careType?: "Outpatient" | "Inpatient";
+  /** Insurance claim number submitted to the scheme, if this bill was claimed. */
+  claimCode?: string;
+  /** Doctor who ordered the claimed care (resolved via the claim's visit). */
+  orderedBy?: string;
   /** Plain-language settlement status, e.g. "Settled", "Awaiting settlement". */
   paymentStatus?: string;
   currency: string; // "NPR"
@@ -173,6 +181,44 @@ export interface PatientOverview {
     /** a few active medicine names, for recognition */
     sampleNames: string[];
   };
+}
+
+export type ImagingModality =
+  | "usg"
+  | "xray"
+  | "mri"
+  | "ct"
+  | "dental"
+  | "mammo"
+  | "fluoro"
+  | "other";
+
+/** One rendered picture from a study, addressed through the portal's own image proxy. */
+export interface ImagingImage {
+  /** full-size rendered image URL (portal proxy, safe to cache/download) */
+  url: string;
+  /** smaller rendered image URL for list/grid previews */
+  thumbUrl: string;
+}
+
+/** A radiology order and, when the modality produces pictures, its rendered images. */
+export interface ImagingStudy {
+  /** OpenMRS order uuid */
+  orderId: string;
+  /** order/accession number, e.g. "ORD-251595" */
+  orderNumber: string;
+  /** human study name from the order concept, e.g. "X-ray Chest PA View" */
+  name: string;
+  modality: ImagingModality;
+  date?: string;
+  /** plain-language fulfilment status, e.g. "Completed", "In progress" */
+  status?: string;
+  /** true when a DICOM study with viewable images exists */
+  hasImages: boolean;
+  /** true for modalities that deliver a written report only (e.g. ultrasound) */
+  reportOnly: boolean;
+  imageCount: number;
+  images: ImagingImage[];
 }
 
 export type DocumentKind = "summary" | "prescription" | "lab" | "report";

@@ -6,8 +6,16 @@ import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
 import { toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import {
+    findStudyUid,
+    isPacsModality,
+    listInstances,
+    modalityFromConcept,
+    signImage,
+} from "../lib/pacs";
 import type {
     Bill,
+    ImagingStudy,
     LabResult,
     Medication,
     Patient,
@@ -76,6 +84,7 @@ const hospitals = [
     { prefix: "ABHU", server: "abhu" },
     { prefix: "RUPA", server: "rupa" },
     { prefix: "DGPH", server: "dlph" },
+    { prefix: "LAMJ", server: "lamj" },
 ];
 
 import { JWT_SECRET } from "../config/env";
@@ -613,6 +622,83 @@ export const appRouter = router({
     ),
 
     /**
+     * patientImaging — read-only radiology orders and their rendered images. For PACS
+     * modalities (x-ray/CT/MRI/...) we resolve the DICOM study by accession and expose
+     * its instances as portal-proxied, signed image URLs. Ultrasound and similar are
+     * report-only (no DICOM). Identity is the token uuid. See server/lib/pacs.ts.
+     */
+    patientImaging: protectedProcedure.query(
+        async ({ ctx }): Promise<ImagingStudy[]> => {
+            const orderTypeIds = [
+                "d3561dc0-5e07-11ef-8f7c-0242ac120002", // Radiology Order
+                "b2b3613b-d654-11f0-ba57-b21ad4457a5e", // USG Order
+            ];
+            const lists = await Promise.all(
+                orderTypeIds.map((ot) =>
+                    ctx.clients
+                        .OpenmrsAPI<{ results: any[] }>("order", {
+                            query: {
+                                patient: ctx.auth.uuid,
+                                orderType: ot,
+                                v: "custom:(uuid,orderNumber,accessionNumber,concept:(uuid,display),fulfillerStatus,dateActivated)",
+                            },
+                        })
+                        .then((r) => r.results ?? [])
+                        .catch(() => []),
+                ),
+            );
+
+            const seen = new Set<string>();
+            const orders: any[] = [];
+            for (const list of lists) {
+                for (const o of list) {
+                    if (o?.uuid && !seen.has(o.uuid)) {
+                        seen.add(o.uuid);
+                        orders.push(o);
+                    }
+                }
+            }
+            orders.sort((a, b) =>
+                String(b.dateActivated ?? "").localeCompare(String(a.dateActivated ?? "")),
+            );
+
+            return Promise.all(
+                orders.map(async (o): Promise<ImagingStudy> => {
+                    const name = o.concept?.display ?? "Imaging";
+                    const modality = modalityFromConcept(name);
+                    const accession = o.orderNumber ?? o.accessionNumber;
+                    const base = {
+                        orderId: String(o.uuid ?? ""),
+                        orderNumber: String(accession ?? ""),
+                        name,
+                        modality,
+                        date: o.dateActivated ?? undefined,
+                        status: fulfillerLabel(o.fulfillerStatus),
+                    };
+                    if (!isPacsModality(modality) || !accession) {
+                        return { ...base, hasImages: false, reportOnly: true, imageCount: 0, images: [] };
+                    }
+                    const study = await findStudyUid(ctx.clients.OpenmrsRAWAPI, String(accession));
+                    if (!study) {
+                        return { ...base, hasImages: false, reportOnly: false, imageCount: 0, images: [] };
+                    }
+                    const instances = await listInstances(ctx.clients.OpenmrsRAWAPI, study);
+                    const images = instances.map((i) =>
+                        signImage({ server: ctx.auth.server, study, series: i.series, sop: i.sop }),
+                    );
+                    return {
+                        ...base,
+                        hasImages: images.length > 0,
+                        reportOnly: false,
+                        imageCount: images.length,
+                        images,
+                    };
+                }),
+            );
+        },
+    ),
+
+    /**
      * patientBills — read-only billing & insurance view. One Bill per Odoo customer
      * invoice (account.move) for this patient, with itemized lines (account.move.line)
      * and a coverage block. Identity from the token; calls ONLY search_read.
@@ -638,6 +724,7 @@ export const appRouter = router({
             {
                 id: number;
                 name: string | false;
+                move_type: string | false;
                 invoice_date: string | false;
                 date: string | false;
                 amount_total: number;
@@ -654,7 +741,8 @@ export const appRouter = router({
             args: [
                 [
                     ["partner_id.uuid", "=", ctx.auth.uuid],
-                    ["move_type", "=", "out_invoice"],
+                    // Show charges AND refunds (money returned), so the picture is complete.
+                    ["move_type", "in", ["out_invoice", "out_refund"]],
                     ["state", "!=", "cancel"],
                 ],
             ],
@@ -662,6 +750,7 @@ export const appRouter = router({
                 fields: [
                     "id",
                     "name",
+                    "move_type",
                     "invoice_date",
                     "date",
                     "amount_total",
@@ -677,6 +766,13 @@ export const appRouter = router({
         });
 
         if (!Array.isArray(invoices) || invoices.length === 0) return [];
+
+        // Resolve the ordering doctor for submitted insurance claims via the claim audit
+        // (account.move -> visit -> diagnosing practitioner). Fully optional; never breaks billing.
+        const orderedByMove = await fetchClaimDoctors(
+            ctx,
+            invoices.map((i) => i.id),
+        );
 
         return Promise.all(
             invoices.map(async (inv) => {
@@ -710,11 +806,77 @@ export const appRouter = router({
                 } catch {
                     lines = [];
                 }
-                return toBill(inv, lines, { nhisNumber });
+                return toBill(inv, lines, { nhisNumber, orderedBy: orderedByMove.get(inv.id) });
             }),
         );
     }),
 });
+
+/**
+ * For a set of invoices, resolve the diagnosing doctor of the visit each claim belongs
+ * to (account.move -> who.insurance.claim_code_audit.visit_id -> patient.visit.diagnosis_by
+ * -> emr.practitioner). Returns moveId -> doctor name. Best-effort: any failure -> empty map.
+ */
+async function fetchClaimDoctors(
+    ctx: { clients: ReturnType<typeof createClients> },
+    moveIds: number[],
+): Promise<Map<number, string>> {
+    const out = new Map<number, string>();
+    if (!moveIds.length) return out;
+    try {
+        const audits = await ctx.clients.OdooAPI.rpc<
+            { move_id: [number, string] | false; visit_id: [number, string] | false }[]
+        >({
+            model: "who.insurance.claim_code_audit",
+            method: "search_read",
+            args: [[["move_id", "in", moveIds]]],
+            kwargs: { fields: ["move_id", "visit_id"] },
+        });
+
+        const moveToVisit = new Map<number, number>();
+        for (const a of audits ?? []) {
+            const mid = Array.isArray(a.move_id) ? a.move_id[0] : undefined;
+            const vid = Array.isArray(a.visit_id) ? a.visit_id[0] : undefined;
+            if (mid && vid) moveToVisit.set(mid, vid);
+        }
+        const visitIds = [...new Set([...moveToVisit.values()])];
+        if (!visitIds.length) return out;
+
+        const visits = await ctx.clients.OdooAPI.rpc<{ id: number; diagnosis_by: number[] }[]>({
+            model: "patient.visit",
+            method: "search_read",
+            args: [[["id", "in", visitIds]]],
+            kwargs: { fields: ["id", "diagnosis_by"] },
+        });
+        const visitToDoc = new Map<number, number>();
+        const docIds = new Set<number>();
+        for (const v of visits ?? []) {
+            const first = v.diagnosis_by?.[0];
+            if (first) {
+                visitToDoc.set(v.id, first);
+                docIds.add(first);
+            }
+        }
+        if (!docIds.size) return out;
+
+        const docs = await ctx.clients.OdooAPI.rpc<{ id: number; name: string }[]>({
+            model: "emr.practitioner",
+            method: "search_read",
+            args: [[["id", "in", [...docIds]]]],
+            kwargs: { fields: ["id", "name"] },
+        });
+        const docName = new Map((docs ?? []).map((d) => [d.id, d.name]));
+
+        for (const [mid, vid] of moveToVisit) {
+            const docId = visitToDoc.get(vid);
+            const name = docId ? docName.get(docId) : undefined;
+            if (name) out.set(mid, name);
+        }
+    } catch {
+        // best-effort enrichment only
+    }
+    return out;
+}
 
 type RawVisit = {
     external_uuid: string;
@@ -755,6 +917,23 @@ async function fetchRawVisits(
             ...(externalUuid ? { limit: 1 } : {}),
         },
     });
+}
+
+/** Plain-language label for an OpenMRS order fulfillerStatus. */
+function fulfillerLabel(status?: string): string {
+    switch (String(status)) {
+        case "COMPLETED":
+            return "Completed";
+        case "IN_PROGRESS":
+            return "In progress";
+        case "RECEIVED":
+            return "Received";
+        case "DECLINED":
+        case "EXCEPTION":
+            return "Not done";
+        default:
+            return "Ordered";
+    }
 }
 
 /** Resolve the diagnosing practitioner for a visit, if any. */

@@ -1,0 +1,41 @@
+- generic [ref=e18]:
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - img [ref=e23]
+      - generic [ref=e26]:
+        - generic [ref=e27]: EHRPlus
+        - generic [ref=e28]: WHO Nepal Patient Portal
+    - generic [ref=e29]:
+      - heading "Sign in" [level=1] [ref=e30]
+      - paragraph [ref=e31]: View your visits, lab results, medicines, and bills from your hospital.
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: Hospital
+        - button "Try again" [ref=e36] [cursor=pointer]:
+          - generic [ref=e37]: Try again
+        - generic [ref=e38]:
+          - img [ref=e39]
+          - generic [ref=e41]: No hospitals are available right now. Please try again shortly.
+      - generic [ref=e42]:
+        - generic [ref=e43]: Medical Record Number (MRN)
+        - generic [ref=e44]:
+          - img [ref=e45]
+          - textbox "Medical Record Number (MRN)" [ref=e49]:
+            - /placeholder: ABCD123456
+        - generic [ref=e50]: Printed on your hospital card or visit ticket.
+      - generic [ref=e52]:
+        - button "Sign in" [disabled]:
+          - img
+          - generic: Sign in
+    - generic [ref=e53]:
+      - generic [ref=e56]: OR
+      - button "Scan the QR code on your visit ticket" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+        - generic [ref=e66]: Scan your visit ticket
+  - generic [ref=e67]:
+    - generic [ref=e68]:
+      - img [ref=e69]
+      - generic [ref=e72]: View-only access to your records. Nothing is changed.
+    - generic [ref=e73]:
+      - img [ref=e74]
+      - generic [ref=e77]: Your data stays private to you.

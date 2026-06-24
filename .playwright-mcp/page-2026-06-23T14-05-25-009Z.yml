@@ -1,0 +1,23 @@
+- generic [ref=e11]:
+  - generic [ref=e18]:
+    - generic [ref=e19]:
+      - generic [ref=e20]: We could not load your overview
+      - paragraph [ref=e21]: This is usually a network hiccup. Your data is safe. Please try again.
+    - button "Try again" [ref=e24] [cursor=pointer]:
+      - generic [ref=e25]: Try again
+  - generic [ref=e26]:
+    - generic [ref=e27]:
+      - img [ref=e28]
+      - generic [ref=e33]: Home
+    - generic [ref=e34]:
+      - img [ref=e35]
+      - generic [ref=e39]: Visits
+    - generic [ref=e40]:
+      - img [ref=e41]
+      - generic [ref=e43]: Results
+    - generic [ref=e44]:
+      - img [ref=e45]
+      - generic [ref=e48]: Medicines
+    - generic [ref=e49]:
+      - img [ref=e50]
+      - generic [ref=e53]: Profile

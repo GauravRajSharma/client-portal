@@ -47,11 +47,13 @@ function OutstandingHeader({ bills }: { bills: Bill[] }) {
     let billed = 0;
     let paid = 0;
     for (const b of bills) {
+      // A refund returns money, so it nets down billed/paid, not up.
+      const sign = b.kind === "refund" ? -1 : 1;
       due += b.due;
-      billed += b.total;
-      paid += b.paid;
+      billed += sign * b.total;
+      paid += sign * b.paid;
     }
-    return { due: Math.max(0, due), billed, paid };
+    return { due: Math.max(0, due), billed: Math.max(0, billed), paid: Math.max(0, paid) };
   }, [bills]);
   const settled = totals.due <= 0;
 
@@ -210,21 +212,52 @@ function CoverageBlock({ insurance }: { insurance: NonNullable<Bill["insurance"]
 
 function BillCard({ bill, wide }: { bill: Bill; wide: boolean }) {
   const status = billStatus(bill);
+  const isRefund = bill.kind === "refund";
   return (
     <DLCard p="$4" gap="$3">
       <XStack items="flex-start" justify="space-between" gap="$3" flexWrap="wrap">
-        <YStack gap="$0.5" flex={1} minW={0}>
+        <YStack gap="$1" flex={1} minW={0}>
           <Text fontSize={14.5} fontWeight="700" color="$color12" numberOfLines={1}>
             {bill.number ?? "Bill"}
           </Text>
-          {bill.date ? (
-            <Text fontSize={12} color="$text2">
-              {bill.date.slice(0, 10)}
+          <XStack items="center" gap="$2" flexWrap="wrap">
+            {bill.date ? (
+              <Text fontSize={12} color="$text2">
+                {bill.date.slice(0, 10)}
+              </Text>
+            ) : null}
+            {bill.careType ? (
+              <Text fontSize={11.5} fontWeight="600" color="$text3">
+                {bill.careType}
+              </Text>
+            ) : null}
+          </XStack>
+        </YStack>
+        <YStack items="flex-end" gap="$1.5">
+          {isRefund ? <DLStatusPill label="Refund" color="$primary" soft="$primarySoft" size="sm" /> : null}
+          <DLStatusPill label={status.label} color={status.color} soft={status.soft} size="sm" />
+        </YStack>
+      </XStack>
+
+      {bill.claimCode || bill.orderedBy ? (
+        <XStack items="center" gap="$2" bg="$primarySoft" rounded={10} px="$3" py="$2" flexWrap="wrap">
+          <ShieldCheck size={14} color="$primary" />
+          {bill.claimCode ? (
+            <Text fontSize={11.5} fontWeight="600" color="$primary" fontFamily="$mono">
+              Claim {bill.claimCode}
+            </Text>
+          ) : (
+            <Text fontSize={11.5} fontWeight="600" color="$primary">
+              Insurance claim
+            </Text>
+          )}
+          {bill.orderedBy ? (
+            <Text fontSize={11.5} color="$primary">
+              · {bill.orderedBy}
             </Text>
           ) : null}
-        </YStack>
-        <DLStatusPill label={status.label} color={status.color} soft={status.soft} size="sm" />
-      </XStack>
+        </XStack>
+      ) : null}
 
       {bill.lines.length > 0 ? (
         <YStack gap="$0.5">

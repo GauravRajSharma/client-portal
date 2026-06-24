@@ -20,6 +20,7 @@ import {
   LogOut,
   Phone,
   Receipt,
+  Scan,
   ShieldCheck,
   ShieldHalf,
 } from "@tamagui/lucide-icons";
@@ -307,6 +308,7 @@ export default function Profile() {
         <Panel p="$0" gap="$0">
           {[
             { Icon: Receipt, label: "Billing & insurance", to: "billing" },
+            { Icon: Scan, label: "Imaging", to: "imaging" },
             { Icon: FileText, label: "Documents", to: "documents" },
             { Icon: FlaskConical, label: "Book a test", to: "book" },
             { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },

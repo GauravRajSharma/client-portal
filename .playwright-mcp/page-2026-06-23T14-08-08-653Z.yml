@@ -1,0 +1,27 @@
+- generic [ref=e11]:
+  - generic [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e18]: Medicines
+      - generic [ref=e19]: What you are currently taking and how to take it.
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: Couldn't load your medicines
+        - paragraph [ref=e24]: We couldn't reach your records right now. Please try again.
+      - button "Try again" [ref=e27] [cursor=pointer]:
+        - generic [ref=e28]: Try again
+  - generic [ref=e29]:
+    - generic [ref=e30]:
+      - img [ref=e31]
+      - generic [ref=e36]: Home
+    - generic [ref=e37]:
+      - img [ref=e38]
+      - generic [ref=e42]: Visits
+    - generic [ref=e43]:
+      - img [ref=e44]
+      - generic [ref=e46]: Results
+    - generic [ref=e47]:
+      - img [ref=e48]
+      - generic [ref=e51]: Medicines
+    - generic [ref=e52]:
+      - img [ref=e53]
+      - generic [ref=e56]: Profile

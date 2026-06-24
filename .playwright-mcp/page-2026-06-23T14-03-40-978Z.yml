@@ -1,0 +1,44 @@
+- generic [ref=e93]:
+  - generic [ref=e94]:
+    - generic [ref=e95]:
+      - img [ref=e98]
+      - generic [ref=e101]:
+        - generic [ref=e102]: EHRPlus
+        - generic [ref=e103]: WHO Nepal Patient Portal
+    - generic [ref=e104]:
+      - heading "Sign in" [level=1] [ref=e105]
+      - paragraph [ref=e106]: View your visits, lab results, medicines, and bills from your hospital.
+    - generic [ref=e107]:
+      - generic [ref=e108]:
+        - generic [ref=e109]: Hospital
+        - combobox "Hospital" [ref=e111] [cursor=pointer]:
+          - generic [ref=e112]:
+            - img [ref=e113]
+            - generic: Select your hospital
+          - img [ref=e117]
+        - generic [ref=e119]: Your records are kept at one hospital.
+      - generic [ref=e120]:
+        - generic [ref=e121]: Medical Record Number (MRN)
+        - generic [ref=e122]:
+          - img [ref=e123]
+          - textbox "Medical Record Number (MRN)" [ref=e127]:
+            - /placeholder: ABCD123456
+        - generic [ref=e128]: Printed on your hospital card or visit ticket.
+      - button "Sign in" [ref=e131] [cursor=pointer]:
+        - img [ref=e132]
+        - generic [ref=e135]: Sign in
+    - generic [ref=e136]:
+      - generic [ref=e139]: OR
+      - button "Scan the QR code on your visit ticket" [ref=e142] [cursor=pointer]:
+        - img [ref=e143]
+        - generic [ref=e149]: Scan your visit ticket
+      - generic [ref=e150]:
+        - img [ref=e151]
+        - generic [ref=e154]: We ask for camera access only to read the ticket QR code.
+  - generic [ref=e155]:
+    - generic [ref=e156]:
+      - img [ref=e157]
+      - generic [ref=e160]: View-only access to your records. Nothing is changed.
+    - generic [ref=e161]:
+      - img [ref=e162]
+      - generic [ref=e165]: Your data stays private to you.
