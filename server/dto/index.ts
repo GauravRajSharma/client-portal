@@ -258,6 +258,10 @@ export interface ImagingStudy {
 export interface CareStep {
   key: string;
   label: string;
+  /** richer one-line description of what happened at this step */
+  detail?: string;
+  /** when this step happened (ISO), if known */
+  at?: string;
   status: "completed" | "current" | "pending";
 }
 
