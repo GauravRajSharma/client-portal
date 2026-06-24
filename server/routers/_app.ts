@@ -5,7 +5,9 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
-import { toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import { clean, toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import { ttlCache } from "../lib/cache";
+import { rateLimit } from "../lib/ratelimit";
 import {
     findStudyUid,
     isPacsModality,
@@ -15,8 +17,10 @@ import {
 } from "../lib/pacs";
 import type {
     Allergy,
+    BedAvailability,
     Bill,
     CareStatus,
+    PublicDoctor,
     ImagingStudy,
     LabResult,
     Medication,
@@ -112,6 +116,7 @@ type TAuthData = {
 const t = initTRPC
     .context<{
         token?: string;
+        ip?: string;
         auth?: TAuthData | null;
         clients?: ReturnType<typeof createClients>;
     }>()
@@ -173,6 +178,141 @@ export const appRouter = router({
 
         return results.filter((h) => typeof h !== "undefined") as THospital[];
     }),
+
+    /**
+     * publicDoctorSearch — PRE-LOGIN, rate-limited, server-cached. Searches doctors
+     * (profession="doctor", not nurses) across all sites by NMC/license number or name.
+     * Returns ONLY name, license, title, and which hospitals — never phone or other PII.
+     */
+    publicDoctorSearch: publicProcedure
+        .input(z.object({ q: z.string().trim().min(2).max(60) }))
+        .query(async ({ ctx, input }): Promise<PublicDoctor[]> => {
+            rateLimit(ctx.ip ?? "anon", "doctor", 12, 60_000);
+            const q = input.q.trim();
+            return ttlCache(`doctor:${q.toLowerCase()}`, 90_000, async () => {
+                const lists = await Promise.all(
+                    hospitals.map(async (h) => {
+                        try {
+                            const erp = createERPClient({
+                                BASE_URL: `http://${h.server}.netbird.selfhosted`,
+                            });
+                            const docs = await erp.rpc<any[]>({
+                                model: "emr.practitioner",
+                                method: "search_read",
+                                args: [
+                                    [
+                                        "&",
+                                        ["profession", "=", "doctor"],
+                                        "&",
+                                        ["active", "=", true],
+                                        "|",
+                                        ["license_number", "ilike", q],
+                                        ["name", "ilike", q],
+                                    ],
+                                ],
+                                kwargs: {
+                                    fields: ["name", "license_number", "specialized_title"],
+                                    limit: 25,
+                                },
+                            });
+                            return (docs ?? []).map((d) => ({
+                                name: String(d.name ?? "").trim(),
+                                license: clean<string | undefined>(d.license_number),
+                                title: clean<string | undefined>(d.specialized_title),
+                                hospital: h.prefix,
+                            }));
+                        } catch {
+                            return [];
+                        }
+                    }),
+                );
+                // Group the same doctor (by license, else name) and collect their hospitals.
+                const byKey = new Map<string, PublicDoctor>();
+                for (const d of lists.flat()) {
+                    if (!d.name) continue;
+                    const key = (d.license || d.name).toLowerCase();
+                    const ex = byKey.get(key);
+                    if (ex) {
+                        if (!ex.hospitals.includes(d.hospital)) ex.hospitals.push(d.hospital);
+                    } else {
+                        byKey.set(key, {
+                            name: d.name,
+                            license: d.license,
+                            title: d.title,
+                            hospitals: [d.hospital],
+                        });
+                    }
+                }
+                return [...byKey.values()].slice(0, 60);
+            });
+        }),
+
+    /**
+     * publicBedAvailability — PRE-LOGIN, rate-limited, server-cached. Per-hospital bed
+     * availability (counts by type + free/occupied). NEVER includes any patient info.
+     * Beds come from OpenMRS via the bridge `/views/beds`. Optional `q` filters by type.
+     */
+    publicBedAvailability: publicProcedure
+        .input(z.object({ q: z.string().trim().max(60).optional() }))
+        .query(async ({ ctx, input }): Promise<BedAvailability[]> => {
+            rateLimit(ctx.ip ?? "anon", "beds", 12, 60_000);
+            const q = (input.q ?? "").trim().toLowerCase();
+            return ttlCache(`beds:${q}`, 90_000, async () => {
+                const perHospital = await Promise.all(
+                    hospitals.map(async (h): Promise<BedAvailability | null> => {
+                        try {
+                            const clients = createClients({
+                                BASE_URL: `http://${h.server}.netbird.selfhosted`,
+                            });
+                            // OpenMRS bed-management: hospital-wide beds with status, no patient data.
+                            const res = await clients.OpenmrsAPI<{ results: any[] }>("bed", {
+                                query: { v: "full", limit: 800 },
+                            });
+                            const rows: any[] = res?.results ?? [];
+                            if (!Array.isArray(rows) || !rows.length) return null;
+                            const byType = new Map<string, { total: number; occupied: number }>();
+                            let total = 0;
+                            let occupied = 0;
+                            for (const b of rows) {
+                                const type =
+                                    (typeof b?.bedType === "string" ? b.bedType : undefined) ??
+                                    b?.bedType?.name ??
+                                    b?.bedType?.displayName ??
+                                    "Unspecified";
+                                if (q && !String(type).toLowerCase().includes(q)) continue;
+                                const isOcc = String(b?.status).toUpperCase() === "OCCUPIED";
+                                const t = byType.get(type) ?? { total: 0, occupied: 0 };
+                                t.total++;
+                                total++;
+                                if (isOcc) {
+                                    t.occupied++;
+                                    occupied++;
+                                }
+                                byType.set(type, t);
+                            }
+                            if (!total) return null;
+                            return {
+                                hospital: h.prefix,
+                                total,
+                                occupied,
+                                free: total - occupied,
+                                types: [...byType.entries()]
+                                    .map(([type, v]) => ({
+                                        type,
+                                        total: v.total,
+                                        occupied: v.occupied,
+                                        free: v.total - v.occupied,
+                                    }))
+                                    .sort((a, b) => b.free - a.free),
+                            };
+                        } catch {
+                            return null;
+                        }
+                    }),
+                );
+                return perHospital.filter((x): x is BedAvailability => x !== null);
+            });
+        }),
 
     verify: publicProcedure
         .input(

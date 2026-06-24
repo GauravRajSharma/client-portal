@@ -8,6 +8,7 @@ import {
   Lock,
   Mail,
   ScanFace,
+  Search,
 } from "@tamagui/lucide-icons";
 import { Button, Text, XStack, YStack } from "tamagui";
 
@@ -127,6 +128,26 @@ export default function SignIn() {
       <Text fontSize={12} color="$text3" text="center" mt="$-1">
         Use your MRN or scan your visit-ticket sticker.
       </Text>
+
+      {/* Public, no-login: search doctors + bed availability across hospitals. */}
+      <XStack
+        items="center"
+        justify="center"
+        gap="$2"
+        height={48}
+        rounded={14}
+        borderWidth={1}
+        borderColor="$border"
+        bg="$surface"
+        mt="$1"
+        onPress={() => router.push("/explore" as any)}
+        pressStyle={{ opacity: 0.7 }}
+      >
+        <Search size={17} color="$primary" />
+        <Text fontSize={14} fontWeight="700" color="$primary">
+          Find a doctor or bed
+        </Text>
+      </XStack>
     </AuthLayout>
   );
 }
