@@ -5,17 +5,45 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import * as Crypto from "expo-crypto";
 import { TActiveMedicationOrder } from "../types/initial";
+import { clean, toBill, toLabResult, toMedication, toPatient, toVisit, toVisitDetail } from "../adapters";
+import { ttlCache } from "../lib/cache";
+import { rateLimit } from "../lib/ratelimit";
+import { authDb } from "../auth";
+import {
+    findStudyUid,
+    isPacsModality,
+    listInstances,
+    modalityFromConcept,
+    signImage,
+} from "../lib/pacs";
+import type {
+    Allergy,
+    BedAvailability,
+    Bill,
+    CareStatus,
+    PublicDoctor,
+    ImagingStudy,
+    LabResult,
+    Medication,
+    Patient,
+    PatientDocument,
+    PatientOverview,
+    PatientReport,
+    Prescription,
+    Visit,
+    VisitDetail,
+} from "../dto";
 
 function v(strings: TemplateStringsArray, ...values: any[]): string {
-  let result = strings.reduce((acc, str, i) => {
-    return acc + str + (values[i] || "");
-  }, "");
+    let result = strings.reduce((acc, str, i) => {
+        return acc + str + (values[i] || "");
+    }, "");
 
-  return result.replace(/\s+/g, "");
+    return result.replace(/\s+/g, "");
 }
 
 const customFields = {
-  encounters: v`encounters:(
+    encounters: v`encounters:(
     uuid,
     encounterProviders:(provider),
     diagnoses:(display,certainty),
@@ -28,7 +56,7 @@ const customFields = {
       encounter:(form:(uuid))
     )
   )`,
-  medications: v`
+    medications: v`
     uuid,orderNumber,accessionNumber,
     patient:ref,action,careSetting:ref,
     previousOrder:ref,dateActivated,
@@ -51,419 +79,1469 @@ const customFields = {
   `,
 };
 
+// MRN prefix -> netbird host. Authoritative list (incl. sites added at the end).
 const hospitals = [
-  { prefix: "GLDH", server: "gulmi" },
-  { prefix: "MSMH", server: "msmh" },
-  { prefix: "BJDH", server: "bajh" },
-  { prefix: "ICDH", server: "icdhup" },
-  { prefix: "OKDH", server: "okdh" },
-  { prefix: "KAHS", server: "kahs" },
-  { prefix: "SOLU", server: "solu" },
-  { prefix: "MBDH", server: "mbdh-cloud" },
-  { prefix: "ABHU", server: "abhu" },
-  { prefix: "RUPA", server: "rupa" },
+    { prefix: "MBDH", server: "mbdh" },
+    { prefix: "MSMH", server: "msmh" },
+    { prefix: "DGPH", server: "dlph" },
+    { prefix: "PHDT", server: "damu" },
+    { prefix: "GRKH", server: "grkh" },
+    { prefix: "SNDH", server: "sndh" },
+    { prefix: "GPKM", server: "gpkm" },
+    { prefix: "DHAD", server: "dhad" },
+    { prefix: "LAMJ", server: "lamj" },
+    { prefix: "ABHU", server: "abhu" },
+    { prefix: "GLDH", server: "gldh" },
+    { prefix: "GMH", server: "gmh" },
+    { prefix: "KAHS", server: "kahs" },
+    { prefix: "OKDH", server: "okdh" },
+    { prefix: "ICDH", server: "icdhup" },
+    { prefix: "RUPA", server: "rupa" },
+    { prefix: "SOLU", server: "solu" },
+    { prefix: "BAJH", server: "bajh" },
+    { prefix: "APF", server: "apf" },
 ];
 
-const JWT_VERIFICATION_KEY = "super secret token put this in env";
+import { JWT_SECRET } from "../config/env";
+
+// Secret now comes from the environment (server/config/env.ts), not source.
+const JWT_VERIFICATION_KEY = JWT_SECRET;
 // --
 
 type TAuthData = {
-  uuid: string;
-  name: string;
-  ref: string;
-  server: string;
+    uuid: string;
+    name: string;
+    ref: string;
+    server: string;
 };
 
+type AppUser = { id: string; email: string; name?: string };
+
 const t = initTRPC
-  .context<{
-    token?: string;
-    auth?: TAuthData | null;
-    clients?: ReturnType<typeof createClients>;
-  }>()
-  .create();
+    .context<{
+        token?: string;
+        ip?: string;
+        appUser?: AppUser | null;
+        auth?: TAuthData | null;
+        clients?: ReturnType<typeof createClients>;
+    }>()
+    .create();
 
 export const publicProcedure = t.procedure;
 
+/** Requires a Better Auth app-account session (the thin accounts layer). */
+const appProcedure = t.procedure.use((opts) => {
+    if (!opts.ctx.appUser) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Sign in to your app account." });
+    }
+    return opts.next({ ctx: { appUser: opts.ctx.appUser } });
+});
+
 const protectedProcedure = t.procedure.use(async (opts) => {
-  try {
-    const result = jwt.verify(opts.ctx.token ?? "-", JWT_VERIFICATION_KEY, {
-      complete: true,
-    });
+    try {
+        const result = jwt.verify(opts.ctx.token ?? "-", JWT_VERIFICATION_KEY, {
+            complete: true,
+        });
 
-    if (typeof result.payload !== "object")
-      throw new Error("not a valid auth token");
+        if (typeof result.payload !== "object")
+            throw new Error("not a valid auth token");
 
-    const auth = result.payload as TAuthData;
+        const auth = result.payload as TAuthData;
 
-    const clients = createClients({
-      BASE_URL: `http://${auth.server}.netbird.selfhosted`,
-    });
+        const clients = createClients({
+            BASE_URL: `http://${auth.server}.netbird.selfhosted`,
+        });
 
-    return opts.next({
-      ctx: {
-        auth: result.payload as TAuthData,
-        clients,
-      },
-    });
-  } catch (error) {
-    throw new TRPCError({ code: "UNAUTHORIZED", cause: error });
-  }
+        return opts.next({
+            ctx: {
+                auth: result.payload as TAuthData,
+                clients,
+            },
+        });
+    } catch (error) {
+        throw new TRPCError({ code: "UNAUTHORIZED", cause: error });
+    }
 });
 
 type THospital = {
-  name: string;
-  hospital: {
-    prefix: string;
-    server: string;
-  };
+    name: string;
+    hospital: {
+        prefix: string;
+        server: string;
+    };
 };
 
 export const appRouter = router({
-  hospitals: publicProcedure.query(async () => {
-    const results = await Promise.all(
-      hospitals.map(async (hospital) => {
-        const client = createERPClient({
-          BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
+    hospitals: publicProcedure.query(async () => {
+        const results = await Promise.all(
+            hospitals.map(async (hospital) => {
+                const client = createERPClient({
+                    BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
+                });
+
+                try {
+                    const { name } = await client<THospital>("api/hospital");
+                    return { name, hospital };
+                } catch (error) {
+                    console.log("error", error);
+                    return;
+                }
+            }),
+        );
+
+        return results.filter((h) => typeof h !== "undefined") as THospital[];
+    }),
+
+    /**
+     * publicDoctorSearch — PRE-LOGIN, rate-limited, server-cached. Searches doctors
+     * (profession="doctor", not nurses) across all sites by NMC/license number or name.
+     * Returns ONLY name, license, title, and which hospitals — never phone or other PII.
+     */
+    publicDoctorSearch: publicProcedure
+        .input(z.object({ q: z.string().trim().min(2).max(60) }))
+        .query(async ({ ctx, input }): Promise<PublicDoctor[]> => {
+            rateLimit(ctx.ip ?? "anon", "doctor", 12, 60_000);
+            const q = input.q.trim();
+            return ttlCache(`doctor:${q.toLowerCase()}`, 90_000, async () => {
+                const lists = await Promise.all(
+                    hospitals.map(async (h) => {
+                        try {
+                            const erp = createERPClient({
+                                BASE_URL: `http://${h.server}.netbird.selfhosted`,
+                            });
+                            const docs = await erp.rpc<any[]>({
+                                model: "emr.practitioner",
+                                method: "search_read",
+                                args: [
+                                    [
+                                        "&",
+                                        ["profession", "=", "doctor"],
+                                        "&",
+                                        ["active", "=", true],
+                                        "|",
+                                        ["license_number", "ilike", q],
+                                        ["name", "ilike", q],
+                                    ],
+                                ],
+                                kwargs: {
+                                    fields: ["name", "license_number", "specialized_title"],
+                                    limit: 25,
+                                },
+                            });
+                            return (docs ?? []).map((d) => ({
+                                name: String(d.name ?? "").trim(),
+                                license: clean<string | undefined>(d.license_number),
+                                title: clean<string | undefined>(d.specialized_title),
+                                hospital: h.prefix,
+                            }));
+                        } catch {
+                            return [];
+                        }
+                    }),
+                );
+                // Group the same doctor (by license, else name) and collect their hospitals.
+                const byKey = new Map<string, PublicDoctor>();
+                for (const d of lists.flat()) {
+                    if (!d.name) continue;
+                    const key = (d.license || d.name).toLowerCase();
+                    const ex = byKey.get(key);
+                    if (ex) {
+                        if (!ex.hospitals.includes(d.hospital)) ex.hospitals.push(d.hospital);
+                    } else {
+                        byKey.set(key, {
+                            name: d.name,
+                            license: d.license,
+                            title: d.title,
+                            hospitals: [d.hospital],
+                        });
+                    }
+                }
+                return [...byKey.values()].slice(0, 60);
+            });
+        }),
+
+    /**
+     * publicBedAvailability — PRE-LOGIN, rate-limited, server-cached. Per-hospital bed
+     * availability (counts by type + free/occupied). NEVER includes any patient info.
+     * Beds come from OpenMRS via the bridge `/views/beds`. Optional `q` filters by type.
+     */
+    publicBedAvailability: publicProcedure
+        .input(z.object({ q: z.string().trim().max(60).optional() }))
+        .query(async ({ ctx, input }): Promise<BedAvailability[]> => {
+            rateLimit(ctx.ip ?? "anon", "beds", 12, 60_000);
+            const q = (input.q ?? "").trim().toLowerCase();
+            return ttlCache(`beds:${q}`, 90_000, async () => {
+                const perHospital = await Promise.all(
+                    hospitals.map(async (h): Promise<BedAvailability | null> => {
+                        try {
+                            const clients = createClients({
+                                BASE_URL: `http://${h.server}.netbird.selfhosted`,
+                            });
+                            // OpenMRS bed-management: hospital-wide beds with status, no patient data.
+                            const res = await clients.OpenmrsAPI<{ results: any[] }>("bed", {
+                                query: { v: "full", limit: 800 },
+                            });
+                            const rows: any[] = res?.results ?? [];
+                            if (!Array.isArray(rows) || !rows.length) return null;
+                            const byType = new Map<string, { total: number; occupied: number }>();
+                            let total = 0;
+                            let occupied = 0;
+                            for (const b of rows) {
+                                const type =
+                                    (typeof b?.bedType === "string" ? b.bedType : undefined) ??
+                                    b?.bedType?.name ??
+                                    b?.bedType?.displayName ??
+                                    "Unspecified";
+                                if (q && !String(type).toLowerCase().includes(q)) continue;
+                                const isOcc = String(b?.status).toUpperCase() === "OCCUPIED";
+                                const t = byType.get(type) ?? { total: 0, occupied: 0 };
+                                t.total++;
+                                total++;
+                                if (isOcc) {
+                                    t.occupied++;
+                                    occupied++;
+                                }
+                                byType.set(type, t);
+                            }
+                            if (!total) return null;
+                            return {
+                                hospital: h.prefix,
+                                total,
+                                occupied,
+                                free: total - occupied,
+                                types: [...byType.entries()]
+                                    .map(([type, v]) => ({
+                                        type,
+                                        total: v.total,
+                                        occupied: v.occupied,
+                                        free: v.total - v.occupied,
+                                    }))
+                                    .sort((a, b) => b.free - a.free),
+                            };
+                        } catch {
+                            return null;
+                        }
+                    }),
+                );
+                return perHospital.filter((x): x is BedAvailability => x !== null);
+            });
+        }),
+
+    /* ---- Thin accounts layer: link / list / enter / unlink hospital records ---- */
+
+    /** Link a just-verified hospital record (its access token) to the app account. */
+    linkHospital: appProcedure
+        .input(z.object({ accessToken: z.string() }))
+        .mutation(({ ctx, input }) => {
+            let payload: any;
+            try {
+                payload = jwt.verify(input.accessToken, JWT_VERIFICATION_KEY);
+            } catch {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid hospital token." });
+            }
+            const { uuid, name, ref, server } = payload ?? {};
+            if (!uuid || !server) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Incomplete hospital token." });
+            }
+            authDb
+                .prepare(
+                    `INSERT INTO hospital_link (id, userId, server, uuid, name, ref, createdAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(userId, server, uuid) DO UPDATE SET name = excluded.name, ref = excluded.ref`,
+                )
+                .run(
+                    globalThis.crypto.randomUUID(),
+                    ctx.appUser!.id,
+                    String(server),
+                    String(uuid),
+                    name ? String(name) : null,
+                    ref ? String(ref) : null,
+                    Date.now(),
+                );
+            return { ok: true };
+        }),
+
+    /** The app account's linked hospitals (with display names). */
+    myHospitals: appProcedure.query(async ({ ctx }) => {
+        const rows = authDb
+            .prepare(
+                `SELECT server, uuid, name, ref, createdAt FROM hospital_link WHERE userId = ? ORDER BY createdAt DESC`,
+            )
+            .all(ctx.appUser!.id) as {
+            server: string;
+            uuid: string;
+            name: string | null;
+            ref: string | null;
+            createdAt: number;
+        }[];
+
+        return Promise.all(
+            rows.map(async (r) => {
+                let hospitalName: string | undefined;
+                try {
+                    const erp = createERPClient({ BASE_URL: `http://${r.server}.netbird.selfhosted` });
+                    const h = await erp<{ name: string }>("api/hospital");
+                    hospitalName = h?.name;
+                } catch {
+                    hospitalName = undefined;
+                }
+                const prefix =
+                    hospitals.find((h) => h.server === r.server)?.prefix ?? r.server.toUpperCase();
+                return {
+                    server: r.server,
+                    uuid: r.uuid,
+                    name: r.name ?? undefined,
+                    ref: r.ref ?? undefined,
+                    hospitalName,
+                    prefix,
+                };
+            }),
+        );
+    }),
+
+    /** Re-mint the per-hospital access token for a linked record (to enter the portal). */
+    enterHospital: appProcedure
+        .input(z.object({ server: z.string(), uuid: z.string() }))
+        .mutation(({ ctx, input }) => {
+            const row = authDb
+                .prepare(
+                    `SELECT server, uuid, name, ref FROM hospital_link WHERE userId = ? AND server = ? AND uuid = ?`,
+                )
+                .get(ctx.appUser!.id, input.server, input.uuid) as
+                | { server: string; uuid: string; name: string | null; ref: string | null }
+                | undefined;
+            if (!row) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Hospital not linked to your account." });
+            }
+            const accessToken = jwt.sign(
+                { uuid: row.uuid, name: row.name, ref: row.ref, server: row.server },
+                JWT_VERIFICATION_KEY,
+            );
+            return { uuid: row.uuid, accessToken };
+        }),
+
+    /** Remove a hospital link from the app account. */
+    unlinkHospital: appProcedure
+        .input(z.object({ server: z.string(), uuid: z.string() }))
+        .mutation(({ ctx, input }) => {
+            authDb
+                .prepare(`DELETE FROM hospital_link WHERE userId = ? AND server = ? AND uuid = ?`)
+                .run(ctx.appUser!.id, input.server, input.uuid);
+            return { ok: true };
+        }),
+
+    verify: publicProcedure
+        .input(
+            z.object({
+                token: z.string(),
+                value: z.string(),
+            }),
+        )
+        .mutation(async (opts) => {
+            try {
+                const result = jwt.verify(
+                    opts.input.token,
+                    JWT_VERIFICATION_KEY,
+                    {
+                        complete: true,
+                    },
+                );
+
+                if (!result.payload)
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        cause: "invalid verification request",
+                    });
+
+                if (typeof result.payload !== "object")
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        cause: "invalid verification request",
+                    });
+                const {
+                    uuid,
+                    name,
+                    ref,
+                    server,
+                    verification: { hidden },
+                } = result.payload;
+
+                opts.input.value;
+
+                const digest = await Crypto.digestStringAsync(
+                    Crypto.CryptoDigestAlgorithm.SHA256,
+                    opts.input.value,
+                );
+
+                if (digest !== hidden)
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        cause: "invalid verification request",
+                    });
+
+                return {
+                    uuid: uuid as string,
+                    accessToken: jwt.sign(
+                        {
+                            uuid,
+                            name,
+                            ref,
+                            server,
+                        },
+                        JWT_VERIFICATION_KEY,
+                    ),
+                };
+            } catch (error) {
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    cause: "invalid verification request",
+                });
+            }
+        }),
+
+    signIn: publicProcedure
+        .input(
+            z.object({
+                mrn: z.string(),
+                server: z.string(),
+            }),
+        )
+        .mutation(async (opts) => {
+            let { mrn, server } = opts.input;
+
+            if (server === "") {
+                // Match by prefix the MRN starts with (handles 3- and 4-char prefixes).
+                const up = mrn.toUpperCase();
+                server = hospitals.find((h) => up.startsWith(h.prefix))?.server ?? "";
+            }
+
+            const hospital = hospitals.find((h) => h.server === server);
+
+            if (!hospital)
+                throw new TRPCError({
+                    message: `hospital not found ${server}`,
+                    code: "BAD_REQUEST",
+                });
+
+            if (
+                !mrn
+                    .toLowerCase()
+                    .startsWith(hospital?.prefix?.toLowerCase() ?? "")
+            )
+                mrn = `${hospital.prefix}${mrn}`;
+
+            const client = createERPClient({
+                BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
+            });
+
+            try {
+                const patients = await client.rpc<
+                    {
+                        uuid: string;
+                        id: string;
+                        name: string;
+                        ref: string;
+                        nhis_number: string | false;
+                        mobile: string | false;
+                    }[]
+                >({
+                    model: "res.partner",
+                    method: "search_read",
+                    args: [[["ref", "=", mrn]]],
+                    kwargs: {
+                        fields: [
+                            "uuid",
+                            "id",
+                            "name",
+                            "nhis_number",
+                            "mobile",
+                            "ref",
+                        ],
+                        limit: 1,
+                    },
+                });
+
+                let p = patients?.[0];
+
+                if (!p) throw new Error("patient not found");
+
+                const { uuid, name, ref } = p;
+                const verification = await findTwofaforPatient(p);
+
+                if (!verification)
+                    throw new Error(
+                        "verification metric not found for patient. denied.",
+                    );
+
+                const cookie = jwt.sign(
+                    { uuid, name, ref, server, verification },
+                    JWT_VERIFICATION_KEY,
+                );
+
+                const response = { name, ref, verification, cookie };
+
+                return response;
+            } catch (error) {
+                throw new TRPCError({
+                    message: `${error}`,
+                    code: "BAD_REQUEST",
+                });
+            }
+        }),
+
+    patient: protectedProcedure.query(async ({ ctx }): Promise<Patient> => {
+        // Identity is derived from the verified token (ctx.auth.uuid), never the URL.
+        const patients = await ctx.clients.OdooAPI.rpc<
+            {
+                uuid: string;
+                id: string;
+                name: string;
+                ref: string;
+                nhis_number: string | false;
+                mobile: string | false;
+            }[]
+        >({
+            model: "res.partner",
+            method: "search_read",
+            args: [[["uuid", "=", ctx.auth.uuid]]],
+            kwargs: {
+                fields: ["uuid", "id", "name", "nhis_number", "mobile", "ref"],
+                limit: 1,
+            },
         });
+
+        // Facility name lives on the ERP, not res.partner. Fetch tolerantly: a
+        // failure here must never break the profile. Read-only GET.
+        let hospitalName: string | undefined;
+        try {
+            const hospital = await ctx.clients.OdooAPI<{ name: string }>(
+                "api/hospital",
+            );
+            hospitalName = hospital?.name;
+        } catch {
+            hospitalName = undefined;
+        }
+
+        // Always return a stable DTO; the UI speaks Patient, never raw partner rows.
+        return toPatient(patients?.[0] ?? {}, hospitalName, ctx.auth.server);
+    }),
+    patientActiveMedications: protectedProcedure.query(
+        async ({ ctx }): Promise<Medication[]> => {
+            const response = await ctx.clients.OpenmrsAPI<{
+                results: Array<TActiveMedicationOrder>;
+            }>("order", {
+                query: {
+                    patient: ctx.auth.uuid,
+                    careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+                    // status: "ACTIVE",
+                    orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+                    v: `custom:(${customFields.medications})`,
+                },
+            });
+
+            // Speak DTOs, not raw OpenMRS shapes. Mapping lives in adapters.
+            return (response.results ?? []).map(toMedication);
+        },
+    ),
+
+    patientPrescription: protectedProcedure
+        .input(z.object({ visit: z.string() }))
+        .query(async ({ ctx, input }): Promise<Prescription> => {
+            const html = await ctx.clients.BridgeApi<string>(
+                `/summary/${ctx.auth.uuid}/${input.visit}?mode=visit&format=html`,
+            );
+            const cleanedHtml = html.replace(/<img\b[^>]*>/gi, "");
+
+            return { visitId: input.visit, html: cleanedHtml };
+        }),
+
+    /**
+     * Lab results for a single visit, returned as DTOs (LabResult[]).
+     * The UI never sees raw Odoo/OpenMRS shapes; adapters own that mapping.
+     */
+    patientLabResults: protectedProcedure
+        .input(z.object({ visit: z.string() }))
+        .query(async ({ ctx, input }): Promise<LabResult[]> => {
+            return fetchLabResults(ctx, { visit: input.visit });
+        }),
+
+    /**
+     * Global lab results across ALL of the patient's visits, as DTOs (LabResult[]).
+     * Same emr.lab_observations source as patientLabResults, without the visit filter.
+     * Identity is taken from the verified token (ctx.auth.uuid) only. Read-only.
+     */
+    patientAllLabResults: protectedProcedure.query(
+        async ({ ctx }): Promise<LabResult[]> => {
+            return fetchLabResults(ctx, {});
+        },
+    ),
+
+    /**
+     * Returns app-owned Visit[] DTOs (see server/dto). The UI never sees raw Odoo
+     * fields; mapping lives in toVisit/toPractitioner. Newest visit first.
+     */
+    patientVisits: protectedProcedure.query(async ({ ctx }): Promise<Visit[]> => {
+        const visits = await fetchRawVisits(ctx);
+
+        return Promise.all(
+            visits.map(async (visit) => {
+                const doctor = await fetchVisitDoctor(ctx, visit.diagnosis_by?.[0]);
+                return toVisit(visit, doctor);
+            }),
+        );
+    }),
+
+    /**
+     * A single visit as a VisitDetail DTO (adds diagnoses on top of Visit). Identity
+     * is the token's uuid; the visit's external_uuid scopes the lookup. Read-only.
+     */
+    patientVisit: protectedProcedure
+        .input(z.object({ visit: z.string() }))
+        .query(async ({ ctx, input }): Promise<VisitDetail | null> => {
+            const visits = await fetchRawVisits(ctx, input.visit);
+            const raw = visits?.[0];
+            if (!raw) return null;
+            const doctor = await fetchVisitDoctor(ctx, raw.diagnosis_by?.[0]);
+            return toVisitDetail(raw, doctor);
+        }),
+
+    /**
+     * patientDocuments: read-only catalogue of patient-facing PDFs/HTML the patient
+     * can open (a "Visit summary" PDF and a stitched "Report" PDF per visit).
+     * Security: patient uuid comes ONLY from the verified token (ctx.auth.uuid).
+     */
+    patientDocuments: protectedProcedure.query(async ({ ctx }) => {
+        const bridgeBase = `http://${ctx.auth.server}.netbird.selfhosted:34567`;
+        const patientUuid = ctx.auth.uuid;
+
+        const visits = await ctx.clients.OdooAPI.rpc<
+            {
+                external_uuid: string;
+                id: string;
+                display_name: string;
+                department: string;
+                manual_close_visit: boolean;
+                visit_type: string;
+            }[]
+        >({
+            model: "patient.visit",
+            method: "search_read",
+            args: [[["partner_id.uuid", "=", patientUuid]]],
+            kwargs: {
+                fields: [
+                    "external_uuid",
+                    "id",
+                    "display_name",
+                    "department",
+                    "create_date",
+                    "manual_close_visit",
+                    "visit_type",
+                ],
+                order: "create_date desc",
+            },
+        });
+
+        const documents: PatientDocument[] = [];
+        const groups: {
+            visitId: string;
+            title: string;
+            date?: string;
+            typeLabel: string;
+            documents: PatientDocument[];
+        }[] = [];
+
+        for (const visit of visits) {
+            const v = toVisit(visit);
+            if (!v.id) continue;
+
+            const summary: PatientDocument = {
+                id: `summary-${v.id}`,
+                title: "Visit summary",
+                kind: "summary",
+                format: "pdf",
+                url: `${bridgeBase}/summary/${patientUuid}/${v.id}?format=pdf&receiver=patient`,
+            };
+            const report: PatientDocument = {
+                id: `report-${v.id}`,
+                title: "Report",
+                kind: "report",
+                format: "pdf",
+                url: `${bridgeBase}/reports/${v.id}`,
+            };
+
+            documents.push(summary, report);
+            groups.push({
+                visitId: v.id,
+                title: v.typeLabel,
+                date: v.date,
+                typeLabel: v.typeLabel,
+                documents: [summary, report],
+            });
+        }
+
+        return { documents, groups };
+    }),
+
+    /**
+     * patientOverview — read-only aggregate for the Home screen. One call returns the
+     * latest visit, lab results needing attention, and active-medication summary, all
+     * as DTOs. Identity is from the token (ctx.auth.uuid). No mutation.
+     */
+    patientOverview: protectedProcedure.query(
+        async ({ ctx }): Promise<PatientOverview> => {
+            const ATTENTION_CAP = 4;
+            const MED_SAMPLE = 3;
+
+            const latestVisitPromise = ctx.clients.OdooAPI.rpc<any[]>({
+                model: "patient.visit",
+                method: "search_read",
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: [
+                        "external_uuid",
+                        "id",
+                        "display_name",
+                        "diagnosis_by",
+                        "department",
+                        "payment_type",
+                        "payment_method",
+                        "manual_close_visit",
+                        "visit_type",
+                        "create_date",
+                    ],
+                    order: "create_date desc",
+                    limit: 1,
+                },
+            });
+
+            const labRawPromise = ctx.clients.OdooAPI.rpc<any[]>({
+                model: "emr.lab_observations",
+                method: "search_read",
+                args: [[["patient.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: ["lab_item", "id", "value", "raw", "create_date"],
+                    order: "create_date desc",
+                },
+            });
+
+            const medsPromise = ctx.clients.OpenmrsAPI<{
+                results: Array<TActiveMedicationOrder>;
+            }>("order", {
+                query: {
+                    patient: ctx.auth.uuid,
+                    careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
+                    orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
+                    v: `custom:(${customFields.medications})`,
+                },
+            });
+
+            const [latestVisitRaw, labRaw, medsRes] = await Promise.all([
+                latestVisitPromise,
+                labRawPromise,
+                medsPromise,
+            ]);
+
+            let latestVisit: PatientOverview["latestVisit"];
+            const vRaw = latestVisitRaw?.[0];
+            if (vRaw) {
+                const doctor = await fetchVisitDoctor(ctx, vRaw.diagnosis_by?.[0]);
+                latestVisit = toVisit(vRaw, doctor);
+            }
+
+            const labItems = (labRaw ?? []).filter((r) => r.lab_item);
+            const labResults: LabResult[] = await Promise.all(
+                labItems.map(async (r) => {
+                    let meta: any = {};
+                    try {
+                        meta = await ctx.clients.OpenmrsAPI<any>(
+                            `concept/${r.raw?.concept?.uuid}?v=full`,
+                        );
+                    } catch {
+                        meta = {};
+                    }
+                    return toLabResult(r, meta);
+                }),
+            );
+            const attention = labResults.filter(
+                (r) => r.status !== "normal" && r.status !== "unknown",
+            );
+
+            const meds = (medsRes.results ?? [])
+                .map((m) => toMedication(m))
+                .filter((m) => m.active);
+
+            return {
+                latestVisit,
+                labs: {
+                    attention: attention.slice(0, ATTENTION_CAP),
+                    attentionCount: attention.length,
+                    total: labResults.length,
+                },
+                medications: {
+                    activeCount: meds.length,
+                    sampleNames: meds.slice(0, MED_SAMPLE).map((m) => m.name),
+                },
+            };
+        },
+    ),
+
+    /**
+     * patientImaging — read-only radiology orders and their rendered images. For PACS
+     * modalities (x-ray/CT/MRI/...) we resolve the DICOM study by accession and expose
+     * its instances as portal-proxied, signed image URLs. Ultrasound and similar are
+     * report-only (no DICOM). Identity is the token uuid. See server/lib/pacs.ts.
+     */
+    patientImaging: protectedProcedure.query(
+        async ({ ctx }): Promise<ImagingStudy[]> => {
+            const orderTypeIds = [
+                "d3561dc0-5e07-11ef-8f7c-0242ac120002", // Radiology Order
+                "b2b3613b-d654-11f0-ba57-b21ad4457a5e", // USG Order
+            ];
+            const lists = await Promise.all(
+                orderTypeIds.map((ot) =>
+                    ctx.clients
+                        .OpenmrsAPI<{ results: any[] }>("order", {
+                            query: {
+                                patient: ctx.auth.uuid,
+                                orderType: ot,
+                                v: "custom:(uuid,orderNumber,accessionNumber,concept:(uuid,display),fulfillerStatus,dateActivated)",
+                            },
+                        })
+                        .then((r) => r.results ?? [])
+                        .catch(() => []),
+                ),
+            );
+
+            const seen = new Set<string>();
+            const orders: any[] = [];
+            for (const list of lists) {
+                for (const o of list) {
+                    if (o?.uuid && !seen.has(o.uuid)) {
+                        seen.add(o.uuid);
+                        orders.push(o);
+                    }
+                }
+            }
+            orders.sort((a, b) =>
+                String(b.dateActivated ?? "").localeCompare(String(a.dateActivated ?? "")),
+            );
+
+            return Promise.all(
+                orders.map(async (o): Promise<ImagingStudy> => {
+                    const name = o.concept?.display ?? "Imaging";
+                    const modality = modalityFromConcept(name);
+                    const accession = o.orderNumber ?? o.accessionNumber;
+                    const base = {
+                        orderId: String(o.uuid ?? ""),
+                        orderNumber: String(accession ?? ""),
+                        name,
+                        modality,
+                        date: o.dateActivated ?? undefined,
+                        status: fulfillerLabel(o.fulfillerStatus),
+                    };
+                    if (!isPacsModality(modality) || !accession) {
+                        return { ...base, hasImages: false, reportOnly: true, imageCount: 0, images: [] };
+                    }
+                    const study = await findStudyUid(ctx.clients.OpenmrsRAWAPI, String(accession));
+                    if (!study) {
+                        return { ...base, hasImages: false, reportOnly: false, imageCount: 0, images: [] };
+                    }
+                    const instances = await listInstances(ctx.clients.OpenmrsRAWAPI, study);
+                    const images = instances.map((i) =>
+                        signImage({ server: ctx.auth.server, study, series: i.series, sop: i.sop }),
+                    );
+                    return {
+                        ...base,
+                        hasImages: images.length > 0,
+                        reportOnly: false,
+                        imageCount: images.length,
+                        images,
+                    };
+                }),
+            );
+        },
+    ),
+
+    /**
+     * patientBills — read-only billing & insurance view. One Bill per Odoo customer
+     * invoice (account.move) for this patient, with itemized lines (account.move.line)
+     * and a coverage block. Identity from the token; calls ONLY search_read.
+     */
+    /**
+     * patientCareStatus — read-only "care in progress" snapshot for the patient's own
+     * open visit (Odoo), enriched with the bridge throughput model (current stage,
+     * journey steps, pending services, in-hospital signal). No open visit -> inactive.
+     */
+    patientCareStatus: protectedProcedure.query(async ({ ctx }): Promise<CareStatus> => {
+        const inactive: CareStatus = {
+            active: false,
+            steps: [],
+            pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
+        };
+        let open: any;
+        try {
+            const visits = await ctx.clients.OdooAPI.rpc<any[]>({
+                model: "patient.visit",
+                method: "search_read",
+                args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
+                kwargs: {
+                    fields: ["external_uuid", "visit_status", "manual_close_visit", "department", "visit_type", "create_date"],
+                    order: "create_date desc",
+                    limit: 5,
+                },
+            });
+            open = (visits ?? []).find(
+                (v) =>
+                    v.visit_status === "open" ||
+                    v.visit_status === "requested-close" ||
+                    v.manual_close_visit === false,
+            );
+        } catch {
+            return inactive;
+        }
+        if (!open?.external_uuid) return inactive;
+
+        const base: CareStatus = {
+            active: true,
+            visitId: String(open.external_uuid),
+            workflow: String(open.visit_type ?? "").toLowerCase() || undefined,
+            department: open.department || undefined,
+            since: open.create_date ? String(open.create_date).replace(" ", "T") : undefined,
+            steps: [],
+            pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
+            // Ward/admission only applies to inpatient visits (per the Odoo open visit).
+            live:
+                String(open.visit_type ?? "").toUpperCase() === "IPD"
+                    ? await fetchLiveContext(ctx)
+                    : undefined,
+        };
 
         try {
-          const { name } = await client<THospital>("api/hospital");
-          return { name, hospital };
-        } catch (error) {
-          console.log("error", error);
-          return;
+            const tp = await ctx.clients.BridgeApi<any>(`/views/throughput/visit/${open.external_uuid}`);
+            const band = tp?.exitProbability?.band as string | undefined;
+            const left = band === "likely_left" || band === "very_likely_left";
+            const svc = tp?.metrics?.services ?? {};
+            const flow = Array.isArray(tp?.currentMoment?.normalFlow) ? tp.currentMoment.normalFlow : [];
+            return {
+                ...base,
+                // An open-but-already-left visit isn't "in progress" for the patient.
+                active: !left,
+                inHospital: !left,
+                durationHours: tp?.visit?.duration?.durationHours,
+                stage: tp?.currentMoment?.label,
+                stageDetail: tp?.currentMoment?.rationale,
+                steps: flow.map((st: any) => ({
+                    key: st.key,
+                    label: friendlyStep(st.key, st.label),
+                    detail: stepDetail(st.key, st.status, st.evidence ?? {}),
+                    at: st.completedAt ?? st.startedAt ?? undefined,
+                    status: st.status,
+                })),
+                pending: {
+                    lab: svc.lab?.pending ?? 0,
+                    radiology: svc.radiology?.pending ?? 0,
+                    procedure: svc.procedure?.pending ?? 0,
+                    medication: svc.medication?.pending ?? 0,
+                },
+            };
+        } catch {
+            return base;
         }
-      }),
-    );
+    }),
 
-    return results.filter((h) => typeof h !== "undefined") as THospital[];
-  }),
+    /**
+     * patientAllergies — read-only allergies/intolerances from OpenMRS FHIR
+     * (AllergyIntolerance). Empty list is a valid, meaningful answer ("none recorded").
+     */
+    patientAllergies: protectedProcedure.query(async ({ ctx }): Promise<Allergy[]> => {
+        try {
+            const bundle = await ctx.clients.OpenmrsFHIRAPI<any>("AllergyIntolerance", {
+                query: { patient: ctx.auth.uuid },
+            });
+            const entries = (bundle?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            return entries.map((r: any): Allergy => ({
+                id: String(r.id ?? ""),
+                substance: r.code?.text ?? r.code?.coding?.[0]?.display ?? "Unknown",
+                criticality: r.criticality,
+                categories: Array.isArray(r.category) ? r.category : [],
+                reactions: (r.reaction ?? []).flatMap((rx: any) =>
+                    (rx.manifestation ?? []).map((m: any) => m.text ?? m.coding?.[0]?.display).filter(Boolean),
+                ),
+            }));
+        } catch {
+            return [];
+        }
+    }),
 
-  verify: publicProcedure
-    .input(
-      z.object({
-        token: z.string(),
-        value: z.string(),
-      }),
-    )
-    .mutation(async (opts) => {
-      try {
-        const result = jwt.verify(opts.input.token, JWT_VERIFICATION_KEY, {
-          complete: true,
-        });
+    /**
+     * patientReports — read-only written reports (radiology / procedure findings),
+     * stored in OpenMRS as result observations whose value is HTML. Newest first.
+     * Empty/blank reports are filtered out.
+     */
+    patientReports: protectedProcedure.query(async ({ ctx }): Promise<PatientReport[]> => {
+        try {
+            const fh = await ctx.clients.OpenmrsFHIRAPI<any>("Observation", {
+                query: { patient: ctx.auth.uuid, _count: "120", _sort: "-date" },
+            });
+            const entries: any[] = (fh?.entry ?? []).map((e: any) => e.resource).filter(Boolean);
+            const isReport = (name: string) =>
+                /result|report|impression|finding|conclusion|interpretation/i.test(name);
+            const textLen = (h: string) => h.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim().length;
+            return entries
+                .map((r) => ({
+                    id: String(r.id ?? ""),
+                    title: r.code?.text ?? r.code?.coding?.[0]?.display ?? "Report",
+                    date: r.effectiveDateTime,
+                    html: typeof r.valueString === "string" ? r.valueString : "",
+                }))
+                .filter((r) => isReport(r.title) && textLen(r.html) > 0);
+        } catch {
+            return [];
+        }
+    }),
 
-        if (!result.payload)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            cause: "invalid verification request",
-          });
+    patientBills: protectedProcedure.query(async ({ ctx }): Promise<Bill[]> => {
+        let nhisNumber: string | undefined;
+        try {
+            const partners = await ctx.clients.OdooAPI.rpc<
+                { nhis_number: string | false }[]
+            >({
+                model: "res.partner",
+                method: "search_read",
+                args: [[["uuid", "=", ctx.auth.uuid]]],
+                kwargs: { fields: ["nhis_number"], limit: 1 },
+            });
+            const raw = partners?.[0]?.nhis_number;
+            nhisNumber = raw && raw !== "" ? String(raw) : undefined;
+        } catch {
+            nhisNumber = undefined;
+        }
 
-        if (typeof result.payload !== "object")
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            cause: "invalid verification request",
-          });
-        const {
-          uuid,
-          name,
-          ref,
-          server,
-          verification: { hidden },
-        } = result.payload;
-
-        opts.input.value;
-
-        const digest = await Crypto.digestStringAsync(
-          Crypto.CryptoDigestAlgorithm.SHA256,
-          opts.input.value,
-        );
-
-        if (digest !== hidden)
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            cause: "invalid verification request",
-          });
-
-        return {
-          uuid: uuid as string,
-          accessToken: jwt.sign(
+        const invoices = await ctx.clients.OdooAPI.rpc<
             {
-              uuid,
-              name,
-              ref,
-              server,
-            },
-            JWT_VERIFICATION_KEY,
-          ),
-        };
-      } catch (error) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          cause: "invalid verification request",
-        });
-      }
-    }),
-
-  signIn: publicProcedure
-    .input(
-      z.object({
-        mrn: z.string(),
-        server: z.string(),
-      }),
-    )
-    .mutation(async (opts) => {
-      let { mrn, server } = opts.input;
-
-      if (server === "") {
-        const prefix = mrn.slice(0, 4).toUpperCase();
-        console.log({ prefix });
-        server = hospitals.find((h) => h.prefix === prefix)?.server ?? "";
-      }
-
-      const hospital = hospitals.find((h) => h.server === server);
-
-      if (!hospital)
-        throw new TRPCError({
-          message: `hospital not found ${server}`,
-          code: "BAD_REQUEST",
-        });
-
-      if (!mrn.toLowerCase().startsWith(hospital?.prefix?.toLowerCase() ?? ""))
-        mrn = `${hospital.prefix}${mrn}`;
-
-      const client = createERPClient({
-        BASE_URL: `http://${hospital.server}.netbird.selfhosted`,
-      });
-
-      try {
-        const patients = await client.rpc<
-          {
-            uuid: string;
-            id: string;
-            name: string;
-            ref: string;
-            nhis_number: string | false;
-            mobile: string | false;
-          }[]
+                id: number;
+                name: string | false;
+                move_type: string | false;
+                invoice_date: string | false;
+                date: string | false;
+                amount_total: number;
+                amount_residual: number;
+                payment_state: string | false;
+                state: string | false;
+                claim_code: string | false;
+                care_type: string | false;
+                currency_id: [number, string] | false;
+            }[]
         >({
-          model: "res.partner",
-          method: "search_read",
-          args: [[["ref", "=", mrn]]],
-          kwargs: {
-            fields: ["uuid", "id", "name", "nhis_number", "mobile", "ref"],
-            limit: 1,
-          },
+            model: "account.move",
+            method: "search_read",
+            args: [
+                [
+                    ["partner_id.uuid", "=", ctx.auth.uuid],
+                    // Show charges AND refunds (money returned), so the picture is complete.
+                    ["move_type", "in", ["out_invoice", "out_refund"]],
+                    ["state", "!=", "cancel"],
+                ],
+            ],
+            kwargs: {
+                fields: [
+                    "id",
+                    "name",
+                    "move_type",
+                    "invoice_date",
+                    "date",
+                    "amount_total",
+                    "amount_residual",
+                    "payment_state",
+                    "state",
+                    "claim_code",
+                    "care_type",
+                    "currency_id",
+                ],
+                order: "invoice_date desc, id desc",
+            },
         });
 
-        let p = patients?.[0];
+        if (!Array.isArray(invoices) || invoices.length === 0) return [];
 
-        if (!p) throw new Error("patient not found");
-
-        const { uuid, name, ref } = p;
-        const verification = await findTwofaforPatient(p);
-
-        if (!verification)
-          throw new Error("verification metric not found for patient. denied.");
-
-        const cookie = jwt.sign(
-          { uuid, name, ref, server, verification },
-          JWT_VERIFICATION_KEY,
+        // Resolve the ordering doctor for submitted insurance claims via the claim audit
+        // (account.move -> visit -> diagnosing practitioner). Fully optional; never breaks billing.
+        const orderedByMove = await fetchClaimDoctors(
+            ctx,
+            invoices.map((i) => i.id),
         );
 
-        const response = { name, ref, verification, cookie };
+        return Promise.all(
+            invoices.map(async (inv) => {
+                let lines: any[] = [];
+                try {
+                    // Odoo 16: real charge rows carry display_type="product".
+                    // (section/note/tax/payment_term rows are not itemized charges, and
+                    // the old `exclude_from_invoice_tab` field no longer exists — querying
+                    // it threw and silently emptied every bill.)
+                    lines = await ctx.clients.OdooAPI.rpc<any[]>({
+                        model: "account.move.line",
+                        method: "search_read",
+                        args: [
+                            [
+                                ["move_id", "=", inv.id],
+                                ["display_type", "=", "product"],
+                            ],
+                        ],
+                        kwargs: {
+                            fields: [
+                                "name",
+                                "quantity",
+                                "price_unit",
+                                "price_subtotal",
+                                "price_total",
+                                "product_id",
+                            ],
+                            order: "sequence asc, id asc",
+                        },
+                    });
+                } catch {
+                    lines = [];
+                }
+                return toBill(inv, lines, { nhisNumber, orderedBy: orderedByMove.get(inv.id) });
+            }),
+        );
+    }),
+});
 
-        return response;
-      } catch (error) {
-        throw new TRPCError({
-          message: `${error}`,
-          code: "BAD_REQUEST",
+/**
+ * For a set of invoices, resolve the diagnosing doctor of the visit each claim belongs
+ * to (account.move -> who.insurance.claim_code_audit.visit_id -> patient.visit.diagnosis_by
+ * -> emr.practitioner). Returns moveId -> doctor name. Best-effort: any failure -> empty map.
+ */
+async function fetchClaimDoctors(
+    ctx: { clients: ReturnType<typeof createClients> },
+    moveIds: number[],
+): Promise<Map<number, string>> {
+    const out = new Map<number, string>();
+    if (!moveIds.length) return out;
+    try {
+        const audits = await ctx.clients.OdooAPI.rpc<
+            { move_id: [number, string] | false; visit_id: [number, string] | false }[]
+        >({
+            model: "who.insurance.claim_code_audit",
+            method: "search_read",
+            args: [[["move_id", "in", moveIds]]],
+            kwargs: { fields: ["move_id", "visit_id"] },
         });
-      }
-    }),
 
-  patient: protectedProcedure.query(async ({ ctx }) => {
-    const patients = await ctx.clients.OdooAPI.rpc<
-      {
-        uuid: string;
-        id: string;
-        name: string;
-        ref: string;
-        nhis_number: string | false;
-        mobile: string | false;
-      }[]
-    >({
-      model: "res.partner",
-      method: "search_read",
-      args: [[["uuid", "=", ctx.auth.uuid]]],
-      kwargs: {
-        fields: ["uuid", "id", "name", "nhis_number", "mobile", "ref"],
-        limit: 1,
-      },
-    });
+        const moveToVisit = new Map<number, number>();
+        for (const a of audits ?? []) {
+            const mid = Array.isArray(a.move_id) ? a.move_id[0] : undefined;
+            const vid = Array.isArray(a.visit_id) ? a.visit_id[0] : undefined;
+            if (mid && vid) moveToVisit.set(mid, vid);
+        }
+        const visitIds = [...new Set([...moveToVisit.values()])];
+        if (!visitIds.length) return out;
 
-    return patients?.[0];
-  }),
-  patientActiveMedications: protectedProcedure.query(async ({ ctx }) => {
-    const response = await ctx.clients.OpenmrsAPI<{
-      results: Array<TActiveMedicationOrder>;
-    }>("order", {
-      query: {
-        patient: ctx.auth.uuid,
-        careSetting: "6f0c9a92-6f24-11e3-af88-005056821db0",
-        // status: "ACTIVE",
-        orderType: "131168f4-15f5-102d-96e4-000c29c2a5d7",
-        v: `custom:(${customFields.medications})`,
-      },
-    });
+        const visits = await ctx.clients.OdooAPI.rpc<{ id: number; diagnosis_by: number[] }[]>({
+            model: "patient.visit",
+            method: "search_read",
+            args: [[["id", "in", visitIds]]],
+            kwargs: { fields: ["id", "diagnosis_by"] },
+        });
+        const visitToDoc = new Map<number, number>();
+        const docIds = new Set<number>();
+        for (const v of visits ?? []) {
+            const first = v.diagnosis_by?.[0];
+            if (first) {
+                visitToDoc.set(v.id, first);
+                docIds.add(first);
+            }
+        }
+        if (!docIds.size) return out;
 
-    return response.results;
-  }),
+        const docs = await ctx.clients.OdooAPI.rpc<{ id: number; name: string }[]>({
+            model: "emr.practitioner",
+            method: "search_read",
+            args: [[["id", "in", [...docIds]]]],
+            kwargs: { fields: ["id", "name"] },
+        });
+        const docName = new Map((docs ?? []).map((d) => [d.id, d.name]));
 
-  patientPrescription: protectedProcedure
-    .input(z.object({ visit: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const html = await ctx.clients.BridgeApi<string>(
-        `/summary/${ctx.auth.uuid}/${input.visit}?mode=visit&format=html`,
-      );
-      const cleanedHtml = html.replace(/<img\b[^>]*>/gi, "");
+        for (const [mid, vid] of moveToVisit) {
+            const docId = visitToDoc.get(vid);
+            const name = docId ? docName.get(docId) : undefined;
+            if (name) out.set(mid, name);
+        }
+    } catch {
+        // best-effort enrichment only
+    }
+    return out;
+}
 
-      return cleanedHtml;
-    }),
+type RawVisit = {
+    external_uuid: string;
+    id: string;
+    display_name: string;
+    department: string;
+    manual_close_visit: boolean;
+    visit_type: string;
+    diagnosis_by: number[];
+    diagnoses?: unknown;
+};
 
-  patientLabResults: protectedProcedure
-    .input(z.object({ visit: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const results = await ctx.clients.OdooAPI.rpc<
-        {
-          id: number;
-          lab_item: [number, string] | false;
-          value: string;
-          raw: {
-            order: { uuid: string };
-            value: string;
-            status: string;
-            concept: { uuid: string };
-          };
-        }[]
-      >({
-        model: "emr.lab_observations",
+/** All of the patient's visits, or just one when `externalUuid` is given. */
+async function fetchRawVisits(
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
+    externalUuid?: string,
+): Promise<RawVisit[]> {
+    const domain: any[] = [["partner_id.uuid", "=", ctx.auth.uuid]];
+    if (externalUuid) domain.push(["external_uuid", "=", externalUuid]);
+
+    return ctx.clients.OdooAPI.rpc<RawVisit[]>({
+        model: "patient.visit",
         method: "search_read",
-        args: [
-          [
-            ["patient.uuid", "=", ctx.auth.uuid],
-            ["patient_visit.external_uuid", "=", input.visit],
-          ],
-        ],
+        args: [domain],
         kwargs: {
-          fields: ["lab_item", "id", "value", "raw"],
-          order: "create_date asc",
+            fields: [
+                "external_uuid",
+                "id",
+                "display_name",
+                "diagnosis_by",
+                "department",
+                "payment_type",
+                "payment_method",
+                "manual_close_visit",
+                "visit_type",
+            ],
+            order: "create_date desc",
+            ...(externalUuid ? { limit: 1 } : {}),
         },
-      });
-      let final = results.filter((r) => r.lab_item);
-
-      return Promise.all(
-        final.map(async (result) => {
-          const meta = await ctx.clients.OpenmrsAPI<{
-            hiAbsolute: number;
-            hiCritical: number;
-            hiNormal: number;
-            lowAbsolute: number;
-            lowCritical: number;
-            lowNormal: number;
-            units: string;
-          }>(`concept/${result.raw.concept.uuid}?v=full`);
-          return { ...result, meta };
-        }),
-      );
-    }),
-
-  patientVisits: protectedProcedure.query(async ({ ctx }) => {
-    const visits = await ctx.clients.OdooAPI.rpc<
-      {
-        external_uuid: string;
-        id: string;
-        display_name: string;
-        department: string;
-        manual_close_visit: boolean;
-        visit_type: string;
-        diagnosis_by: number[];
-      }[]
-    >({
-      model: "patient.visit",
-      method: "search_read",
-      args: [[["partner_id.uuid", "=", ctx.auth.uuid]]],
-      kwargs: {
-        fields: [
-          "external_uuid",
-          "id",
-          "display_name",
-          "diagnosis_by",
-          "department",
-          "payment_type",
-          "payment_method",
-          "manual_close_visit",
-          "visit_type",
-        ],
-        order: "create_date desc",
-      },
     });
+}
 
-    return Promise.all(
-      visits.map(async (visit) => {
-        const doctor = await ctx.clients.OdooAPI.rpc<
-          {
+/**
+ * Live admission context, patient-scoped via the bridge inpatient-admissions view
+ * (`?patients={uuid}`). A row with no stopDatetime means the patient is currently
+ * admitted. (The active-visits board is a today-only staff board that does not reliably
+ * include the patient, so it is deliberately not used.) Best-effort -> undefined.
+ */
+async function fetchLiveContext(
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
+): Promise<CareStatus["live"]> {
+    try {
+        const ia = await ctx.clients.BridgeApi<any>(
+            `/views/inpatient-admissions?patients=${ctx.auth.uuid}`,
+        );
+        const rows: any[] = Array.isArray(ia) ? ia : (ia?.results ?? ia?.data ?? []);
+        const current = rows.find((r) => !r?.visit?.stopDatetime);
+        if (!current) return undefined;
+        const ward = current.currentInpatientLocation?.display ?? current.visit?.location?.display;
+        // Don't surface a non-ward "Outpatient" location as an admission.
+        if (ward && /out\s*patient|opd/i.test(ward)) return { isWard: true };
+        return { isWard: true, ward: ward ?? undefined };
+    } catch {
+        return undefined;
+    }
+}
+
+/** Patient-friendly labels for the care-journey steps from the bridge throughput model. */
+const STEP_LABELS: Record<string, string> = {
+    ticket: "Registered",
+    doctor_assessment: "Seen by doctor",
+    investigations_ordered: "Tests ordered",
+    investigations_fulfilled: "Results",
+    doctor_review_prescription: "Prescription",
+    pharmacy: "Pharmacy",
+    exit: "Discharge",
+};
+function friendlyStep(key: string, fallback?: string): string {
+    return STEP_LABELS[key] ?? fallback ?? key;
+}
+
+/** A richer, patient-friendly one-liner for a care step, using the throughput evidence. */
+function stepDetail(
+    key: string,
+    status: string,
+    ev: Record<string, any>,
+): string | undefined {
+    const n = (x: any) => (typeof x === "number" ? x : 0);
+    const plural = (c: number, w: string) => `${c} ${w}${c === 1 ? "" : "s"}`;
+    switch (key) {
+        case "ticket":
+            return "Your visit was registered at the hospital";
+        case "doctor_assessment":
+            return n(ev.providerInteractionCount) > 0
+                ? `Doctor recorded your history and examination (${plural(n(ev.providerInteractionCount), "note")})`
+                : "Doctor recorded your assessment";
+        case "investigations_ordered":
+            return n(ev.investigationOrderCount) > 0
+                ? `${plural(n(ev.investigationOrderCount), "investigation")} ordered (lab / imaging)`
+                : "Investigations ordered";
+        case "investigations_fulfilled": {
+            const done = n(ev.resultedInvestigations ?? ev.resultedInvestigationItems);
+            const pending = n(ev.pendingInvestigations ?? ev.pendingInvestigationOrders);
+            if (status === "completed") return `${plural(done, "result")} returned`;
+            if (pending > 0) return `${done} back, ${pending} still pending`;
+            return "Waiting for your results to come back";
+        }
+        case "doctor_review_prescription":
+            return ev.hasMedicationOrder
+                ? "Doctor reviewed results and prescribed medicine"
+                : "Doctor reviewed your results";
+        case "pharmacy":
+            return ev.hasMedicationBilling
+                ? "Medicines dispensed at the pharmacy"
+                : "Collect your medicines at the pharmacy";
+        case "exit":
+            return status === "completed"
+                ? "Visit closed"
+                : "You will be discharged when care is complete";
+        default:
+            return undefined;
+    }
+}
+
+/** Plain-language label for an OpenMRS order fulfillerStatus. */
+function fulfillerLabel(status?: string): string {
+    switch (String(status)) {
+        case "COMPLETED":
+            return "Completed";
+        case "IN_PROGRESS":
+            return "In progress";
+        case "RECEIVED":
+            return "Received";
+        case "DECLINED":
+        case "EXCEPTION":
+            return "Not done";
+        default:
+            return "Ordered";
+    }
+}
+
+/** Resolve the diagnosing practitioner for a visit, if any. */
+async function fetchVisitDoctor(
+    ctx: { clients: ReturnType<typeof createClients> },
+    practitionerId?: number,
+) {
+    if (!practitionerId) return undefined;
+    const doctor = await ctx.clients.OdooAPI.rpc<
+        {
             name: string;
             id: number;
             license_number: string;
             specialized_title: string;
-          }[]
-        >({
-          model: "emr.practitioner",
-          method: "search_read",
-          args: [[["id", "=", visit.diagnosis_by?.[0]]]],
-          kwargs: {
+        }[]
+    >({
+        model: "emr.practitioner",
+        method: "search_read",
+        args: [[["id", "=", practitionerId]]],
+        kwargs: {
             fields: ["name", "id", "license_number", "specialized_title"],
             limit: 1,
-          },
-        });
-        return { ...visit, doctor: doctor?.[0] };
-      }),
+        },
+    });
+    return doctor?.[0];
+}
+
+type RawLabObservation = {
+    id: number;
+    lab_item: [number, string] | false;
+    value: string;
+    create_date?: string;
+    raw: {
+        order: { uuid: string };
+        value: string;
+        status: string;
+        concept: { uuid: string };
+    };
+};
+
+type ConceptMeta = {
+    hiAbsolute: number;
+    hiCritical: number;
+    hiNormal: number;
+    lowAbsolute: number;
+    lowCritical: number;
+    lowNormal: number;
+    units: string;
+};
+
+/**
+ * Shared lab-observation fetch + DTO mapping for the per-visit and global lab queries.
+ * Pulls observations from Odoo (emr.lab_observations), enriches each with its OpenMRS
+ * concept reference range (deduped, one call per distinct concept), returns LabResult[].
+ */
+async function fetchLabResults(
+    ctx: { clients: ReturnType<typeof createClients>; auth: TAuthData },
+    opts: { visit?: string },
+): Promise<LabResult[]> {
+    const domain: any[] = [["patient.uuid", "=", ctx.auth.uuid]];
+    if (opts.visit) {
+        domain.push(["patient_visit.external_uuid", "=", opts.visit]);
+    }
+
+    const observations = await ctx.clients.OdooAPI.rpc<RawLabObservation[]>({
+        model: "emr.lab_observations",
+        method: "search_read",
+        args: [domain],
+        kwargs: {
+            fields: ["lab_item", "id", "value", "raw", "create_date"],
+            order: "create_date asc",
+        },
+    });
+
+    const final = observations.filter((r) => r.lab_item);
+
+    const conceptCache = new Map<string, Promise<ConceptMeta | undefined>>();
+    const loadConcept = (uuid?: string) => {
+        if (!uuid) return Promise.resolve(undefined);
+        let cached = conceptCache.get(uuid);
+        if (!cached) {
+            cached = ctx.clients
+                .OpenmrsAPI<ConceptMeta>(`concept/${uuid}?v=full`)
+                .catch(() => undefined);
+            conceptCache.set(uuid, cached);
+        }
+        return cached;
+    };
+
+    return Promise.all(
+        final.map(async (obs) => {
+            const meta = await loadConcept(obs.raw?.concept?.uuid);
+            return toLabResult(obs, meta);
+        }),
     );
-  }),
-});
+}
 
 async function findTwofaforPatient({
-  nhis_number,
-  mobile,
+    nhis_number,
+    mobile,
 }: {
-  uuid: string;
-  id: string;
-  name: string;
-  ref: string;
-  nhis_number: string | false;
-  mobile: string | false;
+    uuid: string;
+    id: string;
+    name: string;
+    ref: string;
+    nhis_number: string | false;
+    mobile: string | false;
 }) {
-  if (nhis_number !== "" && nhis_number) {
-    const digest = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      nhis_number,
-    );
-    return {
-      hidden: digest,
-      field: { label: "Insurance Number", value: "nhis_number" },
-    };
-  }
+    if (nhis_number !== "" && nhis_number) {
+        const digest = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            nhis_number,
+        );
+        return {
+            hidden: digest,
+            field: { label: "Insurance Number", value: "nhis_number" },
+        };
+    }
 
-  if (mobile !== "" && mobile) {
-    const digest = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      mobile,
-    );
-    return {
-      hidden: digest,
-      field: { label: "Mobile Number", value: "mobile" },
-    };
-  }
+    if (mobile !== "" && mobile) {
+        const digest = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            mobile,
+        );
+        return {
+            hidden: digest,
+            field: { label: "Mobile Number", value: "mobile" },
+        };
+    }
 }
 
 // export type definition of API

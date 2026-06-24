@@ -1,110 +1,60 @@
-import { ArrowDown, ArrowLeft, ArrowUp } from "@tamagui/lucide-icons";
+import { FlaskConical } from "@tamagui/lucide-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { Text, XStack, YStack } from "tamagui";
 import {
-  Button,
-  Card,
-  H5,
-  ScrollView,
-  Spinner,
-  View,
-  YStack,
-  Text,
-  XStack,
-} from "tamagui";
+  DLBack,
+  DLScreen,
+  EmptyState,
+  ErrorState,
+  ResultRow,
+  SkeletonList,
+} from "@/components/ui";
 import { trpc } from "@/utils/trpc";
 
-const isWithinRange = (low: number, high: number, value: number) =>
-  Number.isNaN(value) ? true : value >= low && value <= high;
+export default function VisitLabResults() {
+  const { uuid, visit } = useLocalSearchParams<{ uuid: string; visit: string }>();
+  const { data, isLoading, isError, refetch } = trpc.patientLabResults.useQuery({ visit });
 
-const getColorIcon = (
-  inRange: boolean,
-  low: number,
-  high: number,
-  value: number,
-) => {
-  if (inRange) return null;
-
-  if (value > high)
-    return { color: "$red10", icon: () => <ArrowUp color="$red10" /> } as const;
-  if (value < low)
-    return {
-      color: "$accent5",
-      icon: () => <ArrowDown color="$accent5" />,
-    } as const;
-};
-
-export default function Prescriptions() {
-  const { visit } = useLocalSearchParams<{
-    uuid: string;
-    visit: string;
-  }>();
-
-  const { data, isLoading } = trpc.patientLabResults.useQuery({ visit });
+  const attention = (data ?? []).filter((r) => r.status !== "normal" && r.status !== "unknown");
 
   return (
-    <View flex={1}>
-      <Button
-        rounded={0}
-        onPress={async () => {
-          router.back();
-        }}
-      >
-        <ArrowLeft /> Go to visits
-      </Button>
+    <DLScreen>
+      <DLBack label="Visit" onPress={() => router.back()} />
 
-      {isLoading && <Spinner size="large" />}
-      {data &&
-        !isLoading &&
-        (data.length > 0 ? (
-          <ScrollView mb="$4">
-            <YStack gap="$2" p="$4">
-              {data.map((r) => {
-                if (!r.lab_item) return null;
+      <XStack items="flex-end" justify="space-between" gap="$3" px="$0.5">
+        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
+          Visit results
+        </Text>
+        {data && data.length > 0 ? (
+          <Text fontSize={12.5} color="$text2" pb="$1">
+            {attention.length > 0
+              ? `${attention.length} of ${data.length} need attention`
+              : `${data.length} ${data.length === 1 ? "result" : "results"}`}
+          </Text>
+        ) : null}
+      </XStack>
 
-                const inRange = isWithinRange(
-                  r.meta.lowNormal,
-                  r.meta.hiNormal,
-                  Number(r.value),
-                );
-
-                const ci = getColorIcon(
-                  inRange,
-                  r.meta.lowNormal,
-                  r.meta.hiNormal,
-                  Number(r.value),
-                );
-
-                return (
-                  <Card key={r.id} elevate size="$3" bordered width="100%">
-                    <Card.Header gap="$2">
-                      <Text fontSize="$6">{r.lab_item?.[1]}</Text>
-
-                      <XStack items="baseline" justify="space-between">
-                        <XStack items="center" gap="$2">
-                          <Text
-                            fontWeight={!ci ? "normal" : "bold"}
-                            fontSize="$8"
-                            color={ci ? ci.color : "black"}
-                          >
-                            {r.value}
-                          </Text>
-                          <Text>{ci ? <ci.icon /> : null}</Text>
-                        </XStack>
-                        <Text>
-                          {r.meta.lowNormal} - {r.meta.hiNormal} {r.meta.units}
-                        </Text>
-                      </XStack>
-                    </Card.Header>
-                  </Card>
-                );
-              })}
-            </YStack>
-          </ScrollView>
-        ) : (
-          <YStack minH={100} justify="center" items="center">
-            <H5>No Lab Results found</H5>
-          </YStack>
-        ))}
-    </View>
+      {isLoading ? (
+        <SkeletonList count={4} />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetch()} />
+      ) : !data || data.length === 0 ? (
+        <EmptyState
+          Icon={FlaskConical}
+          title="No results for this visit"
+          detail="When the lab finishes your tests for this visit, they will appear here."
+        />
+      ) : (
+        <YStack gap="$2.5">
+          {data.map((result) => (
+            <ResultRow
+              key={result.id}
+              result={result}
+              onPress={() => router.push(`/patient/${uuid}/results/${encodeURIComponent(result.name)}` as any)}
+            />
+          ))}
+        </YStack>
+      )}
+    </DLScreen>
   );
 }

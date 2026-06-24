@@ -36,3 +36,9 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+.claude/worktrees/
+
+# Better Auth SQLite (runtime data, never commit)
+server/data/
+.playwright-mcp/
