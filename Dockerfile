@@ -1,28 +1,26 @@
-# Use an official Node.js runtime as a parent image
-FROM node:20-bullseye
-
-# Set working directory
+# EHRPlus Client Portal — web server (Expo Router, web.output: "server").
+#
+# One stage: the runtime needs the Expo CLI + node_modules to host the export
+# (`expo serve`), so a separate slim stage would save little. node:24 is required —
+# the accounts layer uses the `node:sqlite` built-in (Node >= 22.5; pinned to 24).
+FROM node:24-bookworm-slim
 WORKDIR /app
 
-# Install expo-cli globally
-RUN npm install -g expo-cli
+# Install dependencies first for layer caching. .npmrc carries legacy-peer-deps=true.
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
 
-# Copy package.json and package-lock.json (or yarn.lock) first to leverage Docker cache
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Copy the rest of the app source code
+# App source + production web export (client assets + server/API routes -> dist/).
 COPY . .
+RUN npx expo export -p web --output-dir dist
 
-# Build the web version of the Expo app
-RUN npx expo export -p web
+# auth.db (SQLite) lives here; mount a volume so accounts/passkeys survive restarts.
+RUN mkdir -p server/data
+VOLUME ["/app/server/data"]
 
-# Expose the port that expo serve uses (default 19006)
-EXPOSE 19006
+ENV NODE_ENV=production
+ENV PORT=8973
+EXPOSE 8973
 
-# Start the Expo web server
-ENTRYPOINT ["npx", "expo", "serve"]
-
-CMD ["--port", "19006"]
+# Host the production export (serves static client + runs the API routes).
+CMD ["sh", "-c", "npx expo serve dist --port ${PORT}"]
