@@ -753,7 +753,11 @@ export const appRouter = router({
             since: open.create_date ? String(open.create_date).replace(" ", "T") : undefined,
             steps: [],
             pending: { lab: 0, radiology: 0, procedure: 0, medication: 0 },
-            live: await fetchLiveContext(ctx),
+            // Ward/admission only applies to inpatient visits (per the Odoo open visit).
+            live:
+                String(open.visit_type ?? "").toUpperCase() === "IPD"
+                    ? await fetchLiveContext(ctx)
+                    : undefined,
         };
 
         try {
@@ -1043,10 +1047,10 @@ async function fetchLiveContext(
         const rows: any[] = Array.isArray(ia) ? ia : (ia?.results ?? ia?.data ?? []);
         const current = rows.find((r) => !r?.visit?.stopDatetime);
         if (!current) return undefined;
-        return {
-            isWard: true,
-            ward: current.currentInpatientLocation?.display ?? current.visit?.location?.display ?? undefined,
-        };
+        const ward = current.currentInpatientLocation?.display ?? current.visit?.location?.display;
+        // Don't surface a non-ward "Outpatient" location as an admission.
+        if (ward && /out\s*patient|opd/i.test(ward)) return { isWard: true };
+        return { isWard: true, ward: ward ?? undefined };
     } catch {
         return undefined;
     }

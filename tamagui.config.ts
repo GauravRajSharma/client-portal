@@ -310,8 +310,21 @@ const monoFont = {
   },
 } as any;
 
+// Global density: the UI read slightly too spacious, so tighten every space token
+// (gap / padding / margin) to 0.95x. Type, sizes, and radii are untouched.
+const SPACE_SCALE = 0.95;
+const scaledSpace = Object.fromEntries(
+  Object.entries(defaultConfig.tokens.space).map(([k, v]) =>
+    typeof v === "number" ? [k, Math.round(v * SPACE_SCALE * 100) / 100] : [k, v],
+  ),
+) as typeof defaultConfig.tokens.space;
+
 export const tamaguiConfig = createTamagui({
   ...defaultConfig,
+  tokens: {
+    ...defaultConfig.tokens,
+    space: scaledSpace,
+  },
   fonts: {
     ...defaultConfig.fonts,
     heading: sansFont,
