@@ -2,12 +2,14 @@ import { router, useGlobalSearchParams } from "expo-router";
 import {
   ChevronRight,
   FileText,
+  FlaskConical,
   Pill,
   Receipt,
   Scan,
   ShieldAlert,
   Stethoscope,
 } from "@tamagui/lucide-icons";
+import type { NamedExoticComponent } from "react";
 import { Text, XStack, YStack } from "tamagui";
 import { trpc } from "@/utils/trpc";
 import {
@@ -46,14 +48,31 @@ function initialsOf(name?: string) {
   );
 }
 
-/** One stat column in the results summary card. */
-function Stat({ value, label, color }: { value: string; label: string; color: any }) {
+/** One tappable stat in the "At a glance" card: soft icon chip, number, label. */
+function GlanceStat({
+  Icon,
+  value,
+  label,
+  tint = "$primary",
+  tintSoft = "$primarySoft",
+  onPress,
+}: {
+  Icon: NamedExoticComponent<any>;
+  value: string;
+  label: string;
+  tint?: any;
+  tintSoft?: any;
+  onPress: () => void;
+}) {
   return (
-    <YStack flex={1} items="center" gap="$1">
-      <Text fontSize={26} fontWeight="700" fontFamily="$mono" color={color} letterSpacing={-0.5}>
+    <YStack flex={1} items="center" gap="$1.5" py="$1" onPress={onPress} pressStyle={{ opacity: 0.6 }}>
+      <YStack width={36} height={36} rounded={11} bg={tintSoft} items="center" justify="center">
+        <Icon size={18} color={tint} />
+      </YStack>
+      <Text fontSize={22} fontWeight="700" fontFamily="$mono" color="$color12" letterSpacing={-0.5}>
         {value}
       </Text>
-      <Text fontSize={11.5} fontWeight="600" color="$text2">
+      <Text fontSize={11} fontWeight="600" color="$text2" numberOfLines={1}>
         {label}
       </Text>
     </YStack>
@@ -68,6 +87,8 @@ export default function Home() {
   const labsQ = trpc.patientAllLabResults.useQuery();
   const careQ = trpc.patientCareStatus.useQuery();
   const allergyQ = trpc.patientAllergies.useQuery();
+  const medsQ = trpc.patientActiveMedications.useQuery();
+  const visitsQ = trpc.patientVisits.useQuery();
 
   if (patientQ.isError || labsQ.isError) {
     return (
@@ -98,8 +119,9 @@ export default function Home() {
     .sort((a, b) => ((a.takenAt ?? "") > (b.takenAt ?? "") ? -1 : 1));
 
   const attention = results.filter((r) => r.status !== "normal" && r.status !== "unknown");
-  const normalCount = results.filter((r) => r.status === "normal").length;
   const recent = results.slice(0, 4);
+  const medCount = (medsQ.data ?? []).filter((m) => m.active).length;
+  const visitCount = (visitsQ.data ?? []).length;
 
   return (
     <DLScreen>
@@ -142,44 +164,54 @@ export default function Home() {
         />
       ) : null}
 
-      {/* One calm results summary — replaces the old banners, chips, and metric tiles. */}
-      {results.length > 0 ? (
-        <DLCard p="$4" gap="$3.5" onPress={() => go("results")} pressStyle={{ opacity: 0.85 }}>
-          <XStack items="center" justify="space-between">
-            <Text fontSize={15} fontWeight="700" color="$color12">
-              Your results
+      {/* A whole-picture glance: medicines, visits, results — each tappable. */}
+      <DLCard p="$4" gap="$3.5">
+        <Text fontSize={15} fontWeight="700" color="$color12">
+          At a glance
+        </Text>
+        <XStack>
+          <GlanceStat
+            Icon={Pill}
+            value={String(medCount)}
+            label="Medicines"
+            onPress={() => go("meds")}
+          />
+          <YStack width={1} bg="$border" />
+          <GlanceStat
+            Icon={Stethoscope}
+            value={String(visitCount)}
+            label="Visits"
+            onPress={() => go("visits")}
+          />
+          <YStack width={1} bg="$border" />
+          <GlanceStat
+            Icon={FlaskConical}
+            value={String(attention.length)}
+            label="To review"
+            tint={attention.length ? "$warn" : "$primary"}
+            tintSoft={attention.length ? "$warnSoft" : "$primarySoft"}
+            onPress={() => go("results")}
+          />
+        </XStack>
+        {attention.length > 0 ? (
+          <XStack
+            items="center"
+            gap="$2"
+            bg="$warnSoft"
+            rounded={11}
+            px="$3"
+            py="$2.5"
+            onPress={() => go("results")}
+            pressStyle={{ opacity: 0.7 }}
+          >
+            <Text fontSize={12.5} fontWeight="600" color="$warn" flex={1}>
+              {attention.length} result{attention.length > 1 ? "s" : ""} to review:{" "}
+              {attention.slice(0, 2).map((r) => r.name).join(", ")}
             </Text>
-            <ChevronRight size={18} color="$text3" />
+            <ChevronRight size={15} color="$warn" />
           </XStack>
-          <XStack>
-            <Stat value={String(results.length)} label="Total" color="$color12" />
-            <YStack width={1} bg="$border" />
-            <Stat value={String(normalCount)} label="In range" color="$good" />
-            <YStack width={1} bg="$border" />
-            <Stat
-              value={String(attention.length)}
-              label="Needs review"
-              color={attention.length ? "$warn" : "$text3"}
-            />
-          </XStack>
-          {attention.length > 0 ? (
-            <XStack
-              items="center"
-              gap="$2"
-              bg="$warnSoft"
-              rounded={11}
-              px="$3"
-              py="$2.5"
-            >
-              <Text fontSize={12.5} fontWeight="600" color="$warn" flex={1}>
-                {attention.length} result{attention.length > 1 ? "s" : ""} to review:{" "}
-                {attention.slice(0, 2).map((r) => r.name).join(", ")}
-              </Text>
-              <ChevronRight size={15} color="$warn" />
-            </XStack>
-          ) : null}
-        </DLCard>
-      ) : null}
+        ) : null}
+      </DLCard>
 
       {/* Recent results — a short, scannable list. */}
       {recent.length > 0 ? (
