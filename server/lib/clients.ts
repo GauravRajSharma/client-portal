@@ -46,7 +46,8 @@ const createApiInterceptors = (apiName: string) => ({
   async onResponseError({ request, response, options }: any) {
     const duration = Date.now() - (options._requestStartTime || Date.now());
 
-    logger.error(`[${apiName}] Response Error`, {
+    logger.error({
+      msg: `[${apiName}] Response Error`,
       url: request,
       status: response.status,
       statusText: response.statusText,
