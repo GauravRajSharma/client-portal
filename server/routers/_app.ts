@@ -20,6 +20,7 @@ import {
 import { ttlCache } from "../lib/cache";
 import { rateLimit } from "../lib/ratelimit";
 import { authDb } from "../auth";
+import { signDoc } from "../lib/docs";
 import {
     findStudyUid,
     isPacsModality,
@@ -726,8 +727,8 @@ export const appRouter = router({
      * Security: patient uuid comes ONLY from the verified token (ctx.auth.uuid).
      */
     patientDocuments: protectedProcedure.query(async ({ ctx }) => {
-        const bridgeBase = `http://${ctx.auth.server}.netbird.selfhosted:34567`;
         const patientUuid = ctx.auth.uuid;
+        const server = ctx.auth.server;
 
         const visits = await ctx.clients.OdooAPI.rpc<
             {
@@ -769,19 +770,21 @@ export const appRouter = router({
             const v = toVisit(visit);
             if (!v.id) continue;
 
+            // Portal-relative, signed proxy URLs — the internal bridge address is never
+            // exposed to the client (see server/lib/docs.ts + app/api/docs/download).
             const summary: PatientDocument = {
                 id: `summary-${v.id}`,
                 title: "Visit summary",
                 kind: "summary",
                 format: "pdf",
-                url: `${bridgeBase}/summary/${patientUuid}/${v.id}?format=pdf&receiver=patient`,
+                url: signDoc({ server, uuid: patientUuid, kind: "summary", visit: v.id }),
             };
             const report: PatientDocument = {
                 id: `report-${v.id}`,
                 title: "Report",
                 kind: "report",
                 format: "pdf",
-                url: `${bridgeBase}/reports/${v.id}`,
+                url: signDoc({ server, uuid: patientUuid, kind: "report", visit: v.id }),
             };
 
             documents.push(summary, report);
