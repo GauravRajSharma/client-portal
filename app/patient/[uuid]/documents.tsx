@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import type { DocumentKind, PatientDocument } from "@/server/dto";
 import { trpc } from "@/utils/trpc";
+import { toApiUrl } from "@/utils/api";
 
 const KIND_META: Record<
   DocumentKind,
@@ -26,8 +27,10 @@ const KIND_META: Record<
   lab: { label: "Lab", Icon: FileBox, description: "Laboratory results for this visit." },
 };
 
-/** Open a document URL: new tab on web, in-app browser on native. */
-async function openDocument(url: string) {
+/** Open a document URL: new tab on web, in-app browser on native. The URL is a
+ * portal-relative proxy path; resolve it to the portal origin (no-op on web). */
+async function openDocument(relativeUrl: string) {
+  const url = toApiUrl(relativeUrl);
   if (Platform.OS === "web") {
     const win = window.open(url, "_blank", "noopener,noreferrer");
     if (!win) window.location.assign(url);
