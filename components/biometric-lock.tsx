@@ -88,10 +88,16 @@ export function BiometricLock({ children }: { children: React.ReactNode }) {
   // Decide lock state on mount, then auto-prompt if locked.
   useEffect(() => {
     (async () => {
-      if (await shouldLock()) {
-        setState("locked");
-        unlock();
-      } else {
+      try {
+        if (await shouldLock()) {
+          setState("locked");
+          unlock();
+        } else {
+          setState("open");
+        }
+      } catch {
+        // Fail open: the lock guards an already-persisted session, not our auth boundary.
+        // If SecureStore errors we must not trap the user on the "checking" spinner forever.
         setState("open");
       }
     })();

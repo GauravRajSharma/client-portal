@@ -34,6 +34,8 @@ import { usePrivacy } from "@/utils/privacy";
 import { authClient } from "@/utils/authClient";
 import { apiOrigin } from "@/utils/api";
 import { BiometricLock } from "@/components/biometric-lock";
+import { DEMO } from "@/utils/demo";
+import { demoLink } from "@/utils/demoLink";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -64,9 +66,16 @@ const queryClient = new QueryClient({
 });
 const trpcClient = trpc.createClient({
   links: [
+    ...(DEMO ? [demoLink] : []),
     httpBatchLink({
       fetch(url: any, options: any) {
-        return fetch(url, options);
+        // Mobile networks stall sockets that never resolve or reject; without a ceiling a
+        // hung request keeps a query in `isLoading` forever (endless spinner). Abort at 20s,
+        // forwarding tRPC's own unmount-abort signal.
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 20000);
+        options?.signal?.addEventListener?.("abort", () => ctrl.abort());
+        return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(t));
       },
       // Web: same-origin. Native: apiOrigin (prod gateway, or EXPO_PUBLIC_API_ORIGIN in dev).
       url:
