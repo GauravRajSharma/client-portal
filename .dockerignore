@@ -5,6 +5,9 @@ dist
 ios
 android
 .playwright-mcp
+marketing-video
+out
+*.mp4
 server/data
 npm-debug.log*
 *.log

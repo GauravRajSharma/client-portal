@@ -34,6 +34,8 @@ import { usePrivacy } from "@/utils/privacy";
 import { authClient } from "@/utils/authClient";
 import { apiOrigin } from "@/utils/api";
 import { BiometricLock } from "@/components/biometric-lock";
+import { DEMO } from "@/utils/demo";
+import { demoLink } from "@/utils/demoLink";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -64,6 +66,7 @@ const queryClient = new QueryClient({
 });
 const trpcClient = trpc.createClient({
   links: [
+    ...(DEMO ? [demoLink] : []),
     httpBatchLink({
       fetch(url: any, options: any) {
         // Mobile networks stall sockets that never resolve or reject; without a ceiling a
