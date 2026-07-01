@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Deltalab / Clinical Slate tokens — ported verbatim from tamagui.config.ts.
+   Light in :root, dark under prefers-color-scheme. NativeWind reads these vars
+   on web AND native, so `bg-surface` / `text-fg` theme automatically. */
+:root {
+  --color-app-bg: #eef2fc;
+  --color-surface: #ffffff;
+  --color-surface2: #f2f6fc;
+  --color-surface3: #e9eff7;
+  --color-border: rgba(15, 40, 80, 0.12);
+  --color-border-strong: rgba(15, 40, 80, 0.2);
+  --color-fg: #0e2440; /* was Tamagui $color12 — strongest text */
+  --color-text2: #46566a;
+  --color-text3: #7c8b9e;
+  --color-primary: #0b4ea0;
+  --color-primary-strong: #083a78;
+  --color-primary-soft: #e5edf9;
+  --color-on-primary: #ffffff;
+  --color-brand: #1b6fc2;
+  --color-brand-soft: #e7f0fb;
+  --color-good: #1f9d6b;
+  --color-good-soft: #e2f4ec;
+  --color-warn: #c8860d;
+  --color-warn-soft: #fbf0d8;
+  --color-bad: #d6453d;
+  --color-bad-soft: #fbe5e4;
+  --color-chart-grid: #e6edf4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-app-bg: #0a1626;
+    --color-surface: #11233a;
+    --color-surface2: #16283e;
+    --color-surface3: #1d3047;
+    --color-border: rgba(255, 255, 255, 0.12);
+    --color-border-strong: rgba(255, 255, 255, 0.2);
+    --color-fg: #e7eef6;
+    --color-text2: #9cafc3;
+    --color-text3: #6a7f96;
+    --color-primary: #5a9af0;
+    --color-primary-strong: #7fb2f5;
+    --color-primary-soft: #0f2c52;
+    --color-on-primary: #04203f;
+    --color-brand: #6aa8f7;
+    --color-brand-soft: #0e2c46;
+    --color-good: #34c98a;
+    --color-good-soft: #0f3328;
+    --color-warn: #e0a836;
+    --color-warn-soft: #3a2e10;
+    --color-bad: #f0625a;
+    --color-bad-soft: #3a1b1a;
+    --color-chart-grid: #1c3349;
+  }
+}

@@ -18,6 +18,7 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 
 import { trpc } from "@/utils/trpc";
+import "../global.css";
 import "../tamagui-web.css";
 import { TamaguiProvider } from "@tamagui/core";
 import tamaguiConfig from "../tamagui.config";

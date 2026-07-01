@@ -1,7 +1,12 @@
 module.exports = (api) => {
   api.cache(true);
   return {
-    presets: ["babel-preset-expo"],
+    // NativeWind (jsxImportSource + preset) coexists with Tamagui's compiler
+    // during the migration. Both are removed once the last Tamagui import is gone.
+    presets: [
+      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
+      "nativewind/babel",
+    ],
     plugins: [
       [
         "@tamagui/babel-plugin",
