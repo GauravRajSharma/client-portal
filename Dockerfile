@@ -7,8 +7,9 @@ WORKDIR /app
 # Install expo-cli globally
 RUN npm install -g expo-cli
 
-# Copy package.json and package-lock.json (or yarn.lock) first to leverage Docker cache
-COPY package*.json ./
+# Copy package.json + package-lock + .npmrc first to leverage Docker cache.
+# .npmrc carries legacy-peer-deps=true, required to resolve better-auth's peers.
+COPY package*.json .npmrc ./
 
 # Install dependencies
 RUN npm install
