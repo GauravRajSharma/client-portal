@@ -1,5 +1,5 @@
 import { defaultConfig } from "@tamagui/config/v4";
-import { createTamagui } from "tamagui";
+import { createTamagui, isWeb } from "tamagui";
 
 import { createThemes, defaultComponentThemes } from "@tamagui/theme-builder";
 import * as Colors from "@tamagui/colors";
@@ -191,7 +191,12 @@ const builtThemes = createThemes({
 // back into JS for you, and the bundler plugins set TAMAGUI_ENVIRONMENT. so
 // long as you are using the Vite, Next, Webpack plugins this should just work,
 // but if not you can just export builtThemes directly as themes:
+// Web-only size optimization: on the web *client* prod bundle, ship empty themes and
+// let the bundler plugin hydrate them from CSS. Native (Metro) has no CSS to hydrate
+// from, so it MUST keep the JS themes — otherwise every themed component throws
+// "Missing theme" in a release build. Gate on isWeb so native always gets builtThemes.
 export const themes: Themes =
+  isWeb &&
   process.env.TAMAGUI_ENVIRONMENT === "client" &&
   process.env.NODE_ENV === "production"
     ? ({} as any)
