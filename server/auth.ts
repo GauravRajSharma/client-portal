@@ -21,6 +21,19 @@ mkdirSync(dirname(AUTH_DB_PATH), { recursive: true });
 
 export const authDb = new DatabaseSync(AUTH_DB_PATH);
 
+// Better Auth's own tables. Normally created by `@better-auth/cli migrate`, but a fresh
+// deploy volume never runs the CLI — so create them here (idempotent) or passkey/signup
+// 500 with "no such table". Schema mirrors what the CLI generates for this version; keep
+// in sync if the auth config's fields change. ponytail: run the CLI instead once a real
+// migration story exists.
+authDb.exec(`
+  CREATE TABLE IF NOT EXISTS "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" integer not null, "image" text, "createdAt" date not null, "updatedAt" date not null);
+  CREATE TABLE IF NOT EXISTS "session" ("id" text not null primary key, "expiresAt" date not null, "token" text not null unique, "createdAt" date not null, "updatedAt" date not null, "ipAddress" text, "userAgent" text, "userId" text not null references "user" ("id") on delete cascade);
+  CREATE TABLE IF NOT EXISTS "account" ("id" text not null primary key, "accountId" text not null, "providerId" text not null, "userId" text not null references "user" ("id") on delete cascade, "accessToken" text, "refreshToken" text, "idToken" text, "accessTokenExpiresAt" date, "refreshTokenExpiresAt" date, "scope" text, "password" text, "createdAt" date not null, "updatedAt" date not null);
+  CREATE TABLE IF NOT EXISTS "verification" ("id" text not null primary key, "identifier" text not null, "value" text not null, "expiresAt" date not null, "createdAt" date not null, "updatedAt" date not null);
+  CREATE TABLE IF NOT EXISTS "passkey" ("id" text not null primary key, "name" text, "publicKey" text not null, "userId" text not null references "user" ("id") on delete cascade, "credentialID" text not null, "counter" integer not null, "deviceType" text not null, "backedUp" integer not null, "transports" text, "createdAt" date, "aaguid" text);
+`);
+
 /** Our own table linking an app user to a verified hospital record (no clinical data). */
 authDb.exec(`
   CREATE TABLE IF NOT EXISTS hospital_link (
