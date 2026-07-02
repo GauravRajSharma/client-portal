@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /* Deltalab / Clinical Slate tokens — ported verbatim from tamagui.config.ts.
-   Light in :root, dark under prefers-color-scheme. NativeWind reads these vars
-   on web AND native, so `bg-surface` / `text-fg` theme automatically. */
+   Light-only for now: DESIGN.md makes light the primary theme (dark renders
+   poorly on target devices). Dark is a dedicated future pass; add a `.dark {}`
+   block + a toggle then. NativeWind reads these vars on web AND native. */
 :root {
   --color-app-bg: #eef2fc;
   --color-surface: #ffffff;
@@ -28,33 +29,4 @@
   --color-bad: #d6453d;
   --color-bad-soft: #fbe5e4;
   --color-chart-grid: #e6edf4;
-}
-
-/* Dark tokens gated behind `.dark` (not prefers-color-scheme) so light stays
-   primary and dark never auto-activates from the OS. See tailwind.config.js. */
-.dark:root,
-.dark {
-    --color-app-bg: #0a1626;
-    --color-surface: #11233a;
-    --color-surface2: #16283e;
-    --color-surface3: #1d3047;
-    --color-border: rgba(255, 255, 255, 0.12);
-    --color-border-strong: rgba(255, 255, 255, 0.2);
-    --color-fg: #e7eef6;
-    --color-text2: #9cafc3;
-    --color-text3: #6a7f96;
-    --color-primary: #5a9af0;
-    --color-primary-strong: #7fb2f5;
-    --color-primary-soft: #0f2c52;
-    --color-on-primary: #04203f;
-    --color-brand: #6aa8f7;
-    --color-brand-soft: #0e2c46;
-    --color-good: #34c98a;
-    --color-good-soft: #0f3328;
-    --color-warn: #e0a836;
-    --color-warn-soft: #3a2e10;
-    --color-bad: #f0625a;
-    --color-bad-soft: #3a1b1a;
-    --color-chart-grid: #1c3349;
-  }
 }

@@ -4,10 +4,9 @@
 // alpha (borders are rgba). Add channel-split vars later only if opacity modifiers
 // on these colors are actually needed.
 module.exports = {
-  // Light is the primary theme (DESIGN.md: dark renders poorly on target devices).
-  // Dark is gated behind a `.dark` class that nothing adds yet — so it never
-  // auto-activates from the OS. Wire a real toggle in a dedicated dark-mode pass.
-  darkMode: "class",
+  // Light-only for now (DESIGN.md: dark renders poorly on target devices).
+  // global.css ships no dark tokens, so this is inert until a dedicated dark pass.
+  darkMode: "media",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {
