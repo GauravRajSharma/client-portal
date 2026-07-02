@@ -1,0 +1,17 @@
+# Keep the build context small — these are reinstalled/regenerated in the image
+# or irrelevant to it. Without this the context was ~2GB (node_modules +
+# marketing-video), making every web/APK build crawl.
+node_modules
+.git
+.jj
+dist
+out
+marketing-video
+.expo
+.tamagui
+.playwright-mcp
+android
+ios
+*.apk
+*.log
+.DS_Store
