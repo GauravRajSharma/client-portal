@@ -1,0 +1,43 @@
+# Local Android APK builder for the EHRPlus Client Portal (no EAS cloud).
+# Bakes EXPO_PUBLIC_API_ORIGIN so the app talks to the production domain, runs
+# `expo prebuild` then `gradlew assembleRelease`. Output APK lives at
+# /app/android/app/build/outputs/apk/release/app-release.apk inside the image.
+#
+# Build:   docker build -f Dockerfile.apk -t ehrplus-portal-apk .
+# Extract: docker create --name x ehrplus-portal-apk && \
+#          docker cp x:/app/android/app/build/outputs/apk/release/app-release.apk ./out/
+FROM node:24-bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jdk-headless unzip curl git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Android SDK (cmdline-tools) + the bits RN 0.81 / Expo SDK 54 need.
+ENV ANDROID_SDK_ROOT=/opt/android-sdk ANDROID_HOME=/opt/android-sdk
+RUN mkdir -p $ANDROID_SDK_ROOT/cmdline-tools \
+  && curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/c.zip \
+  && unzip -q /tmp/c.zip -d $ANDROID_SDK_ROOT/cmdline-tools \
+  && mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest \
+  && rm /tmp/c.zip
+ENV PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+RUN yes | sdkmanager --licenses >/dev/null 2>&1 \
+  && sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" \
+       "ndk;27.1.12297006" "cmake;3.22.1" >/dev/null
+
+WORKDIR /app
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
+
+COPY . .
+# Domain baked into the native bundle (EXPO_PUBLIC_* are inlined at build time).
+# Override for staging: --build-arg API_ORIGIN=https://client-staging.ptr.kakeratech.com
+ARG API_ORIGIN=https://client.ptr.kakeratech.com
+ENV EXPO_PUBLIC_API_ORIGIN=$API_ORIGIN
+ENV NODE_ENV=production
+
+RUN npx expo prebuild --platform android --no-install
+WORKDIR /app/android
+# arm64-v8a only: covers all modern phones, much faster build + smaller APK.
+RUN chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon -x lint \
+    -PreactNativeArchitectures=arm64-v8a --stacktrace

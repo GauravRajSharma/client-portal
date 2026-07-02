@@ -67,10 +67,13 @@ const trpcClient = trpc.createClient({
       fetch(url: any, options: any) {
         return fetch(url, options);
       },
+      // Native has no window.origin, so the API host is baked at build time via
+      // EXPO_PUBLIC_API_ORIGIN (see Dockerfile.apk). Falls back to the LAN dev
+      // server for `expo start`. Web always talks to its own origin.
       url: Platform.select({
-        native: "http://192.168.250.118:8081/api/trpc",
+        native: `${process.env.EXPO_PUBLIC_API_ORIGIN ?? "http://192.168.250.118:8081"}/api/trpc`,
         web: `${globalThis?.location?.origin ?? "-"}/api/trpc`,
-        default: "http://192.168.250.118:8081/api/trpc",
+        default: `${process.env.EXPO_PUBLIC_API_ORIGIN ?? "http://192.168.250.118:8081"}/api/trpc`,
       }),
 
       // You can pass any HTTP headers you wish here
