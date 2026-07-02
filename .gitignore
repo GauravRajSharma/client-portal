@@ -31,6 +31,12 @@ yarn-error.*
 
 # local env files
 .env*.local
+deploy/*.env
+
+# generated artifacts
+.playwright-mcp/
+marketing-video/
+out/
 
 # typescript
 *.tsbuildinfo
