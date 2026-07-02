@@ -63,6 +63,23 @@ export default function HospitalSignIn() {
 
   const { mutateAsync: signIn, isPending, error } = trpc.signIn.useMutation();
   const selectedServer = watch("server");
+  const mrnValue = watch("mrn");
+
+  // Auto-select the hospital from the MRN's leading prefix (e.g. "GPKM123456" → GPKM),
+  // mirroring the server's prefix match (see signIn). Longest prefix wins so 3- and
+  // 4-char prefixes don't clash. Only sets when it differs, so manual picks still work.
+  React.useEffect(() => {
+    if (!hospitals?.length) return;
+    const up = mrnValue.trim().toUpperCase();
+    if (up.length < 3) return;
+    const match = [...hospitals]
+      .sort((a, b) => b.hospital.prefix.length - a.hospital.prefix.length)
+      .find((h) => up.startsWith(h.hospital.prefix.toUpperCase()));
+    if (match && match.hospital.server !== selectedServer) {
+      setValue("server", match.hospital.server, { shouldValidate: true });
+      clearErrors("server");
+    }
+  }, [mrnValue, hospitals, selectedServer, setValue, clearErrors]);
 
   const go = async (data: SignInForm) => {
     try {
