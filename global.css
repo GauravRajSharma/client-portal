@@ -30,8 +30,10 @@
   --color-chart-grid: #e6edf4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Dark tokens gated behind `.dark` (not prefers-color-scheme) so light stays
+   primary and dark never auto-activates from the OS. See tailwind.config.js. */
+.dark:root,
+.dark {
     --color-app-bg: #0a1626;
     --color-surface: #11233a;
     --color-surface2: #16283e;

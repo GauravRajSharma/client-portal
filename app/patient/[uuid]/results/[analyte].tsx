@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ArrowLeft, FlaskConical } from "@tamagui/lucide-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
+import { backOr } from "@/utils/nav";
 import { Text, XStack, YStack } from "tamagui";
 import type { LabResult } from "@/server/dto";
 import {
@@ -17,7 +18,7 @@ import {
 import { trpc } from "@/utils/trpc";
 
 export default function AnalyteTrend() {
-  const { analyte } = useLocalSearchParams<{ uuid: string; analyte: string }>();
+  const { uuid, analyte } = useLocalSearchParams<{ uuid: string; analyte: string }>();
   const name = decodeURIComponent(analyte ?? "");
   const { data, isLoading, isError, refetch } = trpc.patientAllLabResults.useQuery();
 
@@ -48,7 +49,7 @@ export default function AnalyteTrend() {
 
   return (
     <DLScreen>
-      <XStack items="center" gap="$2" onPress={() => router.back()} pressStyle={{ opacity: 0.6 }}>
+      <XStack items="center" gap="$2" onPress={() => backOr(`/patient/${uuid}/results`)} pressStyle={{ opacity: 0.6 }}>
         <ArrowLeft size={18} color="$text2" />
         <Text fontSize={14} fontWeight="500" color="$text2">
           Results

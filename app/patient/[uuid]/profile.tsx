@@ -12,6 +12,7 @@ import {
 import type { PiiKind } from "@/utils/privacy";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
+import { authClient } from "@/utils/authClient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Building2,
@@ -89,7 +90,12 @@ function SignOutButton() {
   const queryClient = useQueryClient();
 
   const signOut = async () => {
-    // Local-only: clears the stored token + cached reads. NOT a backend mutation.
+    // End the app-account session too, else the route guard (see index.tsx) sees a
+    // live Better Auth session and bounces back to /auth/hospitals — looking like
+    // sign-out did nothing. Best-effort; local clear + redirect happen regardless.
+    try {
+      await authClient.signOut();
+    } catch {}
     await AsyncStorage.removeItem("access:token");
     queryClient.clear();
     router.replace("/auth/login");

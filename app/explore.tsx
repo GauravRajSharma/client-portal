@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
-import { ArrowLeft, BedDouble, Search, Stethoscope, UserRound } from "lucide-react-native";
+// Icons stay on @tamagui/lucide-icons while this screen still uses Tamagui wrappers
+// (DLScreen/DLCard/EmptyState) — they resolve $tokens for EmptyState AND accept the
+// hex values passed in gs parts. Switch to lucide-react-native when those migrate.
+import { ArrowLeft, BedDouble, Search, Stethoscope, UserRound } from "@tamagui/lucide-icons";
 import type { BedAvailability, PublicDoctor } from "@/server/dto";
 import { DLCard, DLScreen, EmptyState } from "@/components/ui";
 import { HStack, VStack, Text, Pressable, Input, Spinner } from "@/components/ui/gs";
@@ -28,7 +31,7 @@ function TabButton({ active, label, Icon, onPress }: { active: boolean; label: s
         active ? "bg-primary border-primary" : "bg-surface border-border"
       }`}
     >
-      <Icon size={16} color={active ? C.onPrimary : C.text2} />
+      <Icon size={16} color={active ? "$onPrimary" : "$text2"} />
       <Text className={`text-[13.5px] font-plex-bold ${active ? "text-onPrimary" : "text-text2"}`}>{label}</Text>
     </Pressable>
   );
@@ -50,7 +53,7 @@ function SearchBar({
   return (
     <HStack className="gap-2 items-center">
       <HStack className="flex-1 items-center gap-2.5 pl-3.5 h-[46px] rounded-[14px] bg-surface border border-border focus-within:border-primary">
-        <Search size={18} color={C.text3} />
+        <Search size={18} color="$text3" />
         <Input
           className="flex-1 text-[14px] text-fg"
           placeholder={placeholder}
@@ -76,7 +79,7 @@ function DoctorResult({ doc, nameFor }: { doc: PublicDoctor; nameFor: (code: str
     <DLCard p="$3.5" gap="$2.5">
       <HStack className="items-center gap-3">
         <VStack className="w-[40px] h-[40px] rounded-[11px] bg-primarySoft items-center justify-center">
-          <UserRound size={20} color={C.primary} />
+          <UserRound size={20} color="$primary" />
         </VStack>
         <VStack className="flex-1 min-w-0">
           <Text className="text-[15.5px] font-plex-bold text-fg" numberOfLines={1}>
@@ -98,7 +101,7 @@ function DoctorResult({ doc, nameFor }: { doc: PublicDoctor; nameFor: (code: str
       <HStack className="gap-2 flex-wrap pt-1 border-t border-border">
         {doc.hospitals.map((h) => (
           <HStack key={h} className="items-center gap-1.5 bg-surface2 px-2.5 py-1.5 rounded-[20px] mt-2">
-            <Stethoscope size={12} color={C.text2} />
+            <Stethoscope size={12} color="$text2" />
             <Text className="text-[11.5px] font-plex-semibold text-text2">{nameFor(h)}</Text>
           </HStack>
         ))}
@@ -113,7 +116,7 @@ function BedResult({ row, nameFor }: { row: BedAvailability; nameFor: (code: str
       <HStack className="items-center justify-between gap-3">
         <HStack className="items-center gap-2.5 flex-1 min-w-0">
           <VStack className="w-[38px] h-[38px] rounded-[10px] bg-primarySoft items-center justify-center">
-            <BedDouble size={18} color={C.primary} />
+            <BedDouble size={18} color="$primary" />
           </VStack>
           <Text className="text-[15px] font-plex-bold text-fg flex-1" numberOfLines={1}>
             {nameFor(row.hospital)}
@@ -185,7 +188,7 @@ export default function Explore() {
   return (
     <DLScreen maxWidth={620}>
       <Pressable onPress={() => router.replace("/auth/login" as any)} className="flex-row items-center gap-2 self-start active:opacity-60">
-        <ArrowLeft size={18} color={C.text2} />
+        <ArrowLeft size={18} color="$text2" />
         <Text className="text-[14px] font-plex-medium text-text2">Sign in</Text>
       </Pressable>
 

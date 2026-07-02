@@ -1,5 +1,6 @@
 import { FlaskConical } from "@tamagui/lucide-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { backOr } from "@/utils/nav";
 import { Text, XStack, YStack } from "tamagui";
 import {
   DLBack,
@@ -19,7 +20,7 @@ export default function VisitLabResults() {
 
   return (
     <DLScreen>
-      <DLBack label="Visit" onPress={() => router.back()} />
+      <DLBack label="Visit" onPress={() => backOr(`/patient/${uuid}/${visit}`)} />
 
       <XStack items="flex-end" justify="space-between" gap="$3" px="$0.5">
         <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>

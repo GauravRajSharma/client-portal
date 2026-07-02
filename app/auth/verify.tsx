@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Redirect, router, useGlobalSearchParams } from "expo-router";
+import { backOr } from "@/utils/nav";
 import { Controller, useForm } from "react-hook-form";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -82,7 +83,7 @@ export default function VerificationPage() {
           px="$1"
           color="$color10"
           icon={<ArrowLeft size={16} color="$color10" />}
-          onPress={() => router.back()}
+          onPress={() => backOr("/auth/hospital")}
           accessibilityLabel="Go back to sign in"
         >
           <Button.Text fontSize="$3" color="$color10">

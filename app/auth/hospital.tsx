@@ -1,5 +1,6 @@
 import React from "react";
 import { router, useGlobalSearchParams } from "expo-router";
+import { backOr } from "@/utils/nav";
 import { Controller, useForm } from "react-hook-form";
 import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck } from "@tamagui/lucide-icons";
 import { Button, Input, Spinner, Text, XStack, YStack } from "tamagui";
@@ -65,7 +66,7 @@ export default function HospitalSignIn() {
   const selectedServer = watch("server");
   const mrnValue = watch("mrn");
 
-  // Auto-select the hospital from the MRN's leading prefix (e.g. "GPKM123456" → GPKM),
+  // Auto-select the hospital from the MRN's leading prefix (e.g. "GPKH123456" → GPKH),
   // mirroring the server's prefix match (see signIn). Longest prefix wins so 3- and
   // 4-char prefixes don't clash. Only sets when it differs, so manual picks still work.
   React.useEffect(() => {
@@ -115,7 +116,7 @@ export default function HospitalSignIn() {
         items="center"
         gap="$2"
         self="flex-start"
-        onPress={() => router.back()}
+        onPress={() => backOr("/auth/login")}
         pressStyle={{ opacity: 0.6 }}
       >
         <ArrowLeft size={18} color="$text2" />
