@@ -1,5 +1,6 @@
-# Use an official Node.js runtime as a parent image
-FROM node:20-bullseye
+# Node 24: the server runtime needs `node:sqlite` (DatabaseSync) for Better Auth,
+# which does not exist on Node 20. See server/lib/nodeSqlite.ts. Matches prod.
+FROM node:24-bullseye
 
 # Set working directory
 WORKDIR /app
