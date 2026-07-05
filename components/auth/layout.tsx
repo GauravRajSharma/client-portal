@@ -1,79 +1,53 @@
 import type { ReactNode } from "react";
-import { Activity, Eye, Lock, MapPin } from "@tamagui/lucide-icons";
-import {
-  Paragraph,
-  ScrollView,
-  Text,
-  XStack,
-  YStack,
-  styled,
-  useMedia,
-} from "tamagui";
+import { Activity, Eye, Lock, C } from "@/components/ui/icons";
+import { ScrollView, Text, HStack, VStack, useMedia } from "@/components/ui/gs";
+
+const cx = (...parts: (string | undefined | false | null)[]) => parts.filter(Boolean).join(" ");
 
 /** A native HTML <form> on web so the browser treats the inputs as a real form. */
-export const FormStack = styled(YStack, {
-  tag: "form",
-  width: "100%",
-  gap: "$3.5",
-});
+export function FormStack({ className, ...p }: React.ComponentProps<typeof VStack>) {
+  return <VStack className={cx("w-full gap-[15px]", className)} {...p} />;
+}
 
 /** Deltalab brand block: white logo tile + name + place line. Centered. */
 function AuthBrand() {
   return (
-    <YStack items="center" gap="$3" mb="$4" mt="$2">
-      <YStack
-        width={104}
-        height={104}
-        rounded={28}
-        bg="$surface"
-        borderWidth={1}
-        borderColor="$border"
-        items="center"
-        justify="center"
-        shadowColor="rgba(16,36,61,0.18)"
-        shadowRadius={28}
-        shadowOffset={{ width: 0, height: 12 }}
+    <VStack className="items-center gap-[12px] mb-[17px] mt-[7px]">
+      <VStack
+        className="w-[104px] h-[104px] rounded-[28px] bg-surface border border-border items-center justify-center"
+        style={{
+          shadowColor: "rgba(16,36,61,0.18)",
+          shadowRadius: 28,
+          shadowOffset: { width: 0, height: 12 },
+        }}
       >
-        <YStack
-          width={62}
-          height={62}
-          rounded={18}
-          bg="$primary"
-          items="center"
-          justify="center"
-        >
+        <VStack className="w-[62px] h-[62px] rounded-[18px] bg-primary items-center justify-center">
           <Activity size={34} color="#fff" strokeWidth={2.4} />
-        </YStack>
-      </YStack>
-      <YStack items="center" gap="$1.5">
-        <Text fontSize={25} fontWeight="700" color="$color12" letterSpacing={-0.5}>
-          EHRPlus
-        </Text>
-        <Text fontSize={13.5} fontWeight="600" color="$primary">
-          Patient Portal
-        </Text>
-      </YStack>
-    </YStack>
+        </VStack>
+      </VStack>
+      <VStack className="items-center gap-[4px]">
+        <Text className="text-[25px] font-plex-bold text-fg tracking-[-0.5px]">EHRPlus</Text>
+        <Text className="text-[13.5px] font-plex-semibold text-primary">Patient Portal</Text>
+      </VStack>
+    </VStack>
   );
 }
 
 /** Trust footer: the load-bearing reassurance for health data. */
 function AuthFooter() {
   return (
-    <YStack gap="$2.5" pt="$3" mt="$2" borderTopWidth={1} borderColor="$border">
-      <XStack items="center" gap="$2.5">
-        <Eye size={15} color="$text3" />
-        <Text fontSize={12.5} color="$text2" flex={1}>
+    <VStack className="gap-[10px] pt-[12px] mt-[7px] border-t border-border">
+      <HStack className="items-center gap-[10px]">
+        <Eye size={15} color={C.text3} />
+        <Text className="text-[12.5px] text-text2 flex-1">
           View-only access to your records. Nothing is changed.
         </Text>
-      </XStack>
-      <XStack items="center" gap="$2.5">
-        <Lock size={15} color="$text3" />
-        <Text fontSize={12.5} color="$text2" flex={1}>
-          Your data stays private to you.
-        </Text>
-      </XStack>
-    </YStack>
+      </HStack>
+      <HStack className="items-center gap-[10px]">
+        <Lock size={15} color={C.text3} />
+        <Text className="text-[12.5px] text-text2 flex-1">Your data stays private to you.</Text>
+      </HStack>
+    </VStack>
   );
 }
 
@@ -85,45 +59,38 @@ export const AuthLayout = ({ children }: { children: ReactNode }) => {
   const wide = useMedia().md;
 
   const inner = (
-    <YStack width="100%" maxW={wide ? 420 : undefined} mx="auto" gap="$4">
+    <VStack className="w-full mx-auto gap-[17px]" style={{ maxWidth: wide ? 420 : undefined }}>
       <AuthBrand />
       {children}
       <AuthFooter />
-    </YStack>
+    </VStack>
   );
 
   if (wide) {
     return (
-      <YStack flex={1} bg="$appBg" items="center" justify="center" p="$6">
-        <YStack
-          width="100%"
-          maxW={476}
-          rounded={28}
-          bg="$surface"
-          borderWidth={1}
-          borderColor="$border"
-          px="$7"
-          py="$7"
-          shadowColor="rgba(16,36,61,0.18)"
-          shadowRadius={32}
-          shadowOffset={{ width: 0, height: 16 }}
+      <VStack className="flex-1 bg-appBg items-center justify-center p-[30px]">
+        <VStack
+          className="w-full rounded-[28px] bg-surface border border-border px-[37px] py-[37px]"
+          style={{
+            maxWidth: 476,
+            shadowColor: "rgba(16,36,61,0.18)",
+            shadowRadius: 32,
+            shadowOffset: { width: 0, height: 16 },
+          }}
         >
           {inner}
-        </YStack>
-      </YStack>
+        </VStack>
+      </VStack>
     );
   }
 
   return (
     <ScrollView
-      flex={1}
-      bg="$appBg"
+      className="flex-1 bg-appBg"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <YStack flex={1} px="$5" pt="$4" pb="$7">
-        {inner}
-      </YStack>
+      <VStack className="flex-1 px-[23px] pt-[17px] pb-[37px]">{inner}</VStack>
     </ScrollView>
   );
 };

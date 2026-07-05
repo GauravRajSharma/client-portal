@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { BedDouble, Pill, ShieldAlert, ShieldCheck, TriangleAlert } from "@tamagui/lucide-icons";
-import { Text, XStack, YStack } from "tamagui";
+import { BedDouble, Pill, ShieldAlert, ShieldCheck, TriangleAlert, C } from "@/components/ui/icons";
+import { HStack, VStack, Text } from "@/components/ui/gs";
 import {
   DLBack,
   DLCard,
@@ -46,117 +46,114 @@ export default function Passport() {
       {loading ? (
         <SkeletonList count={3} />
       ) : (
-        <YStack gap="$3.5">
-          <YStack px="$0.5" gap="$1">
-            <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
+        <VStack className="gap-[15px]">
+          <VStack className="px-[1px] gap-[2px]">
+            <Text className="text-[23px] font-plex-bold text-fg tracking-[-0.4px]">
               Health passport
             </Text>
-            <Text fontSize={13} color="$text2">
+            <Text className="text-[13px] text-text2">
               Show this to a clinician in an emergency.
             </Text>
-          </YStack>
+          </VStack>
 
           {/* Identity */}
-          <DLCard p="$4">
-            <XStack items="center" gap="$3">
-              <YStack width={52} height={52} rounded={14} bg="$primary" items="center" justify="center">
-                <Text fontSize={18} fontWeight="700" color="$onPrimary">
+          <DLCard className="p-[17px]">
+            <HStack className="items-center gap-[12px]">
+              <VStack className="w-[52px] h-[52px] rounded-[14px] bg-primary items-center justify-center">
+                <Text className="text-[18px] font-plex-bold text-onPrimary">
                   {initials(patient?.name)}
                 </Text>
-              </YStack>
-              <YStack flex={1} minW={0} gap="$1">
-                <Text fontSize={17} fontWeight="800" color="$color12" numberOfLines={1}>
+              </VStack>
+              <VStack className="flex-1 min-w-0 gap-[2px]">
+                <Text className="text-[17px] font-plex-bold text-fg" numberOfLines={1}>
                   {patient?.name ?? "—"}
                 </Text>
-                <PiiValue value={patient?.mrn} kind="mrn" fontSize={13} fontWeight="600" color="$text2" />
+                <PiiValue value={patient?.mrn} kind="mrn" className="text-[13px] font-plex-semibold text-text2" />
                 {patient?.hospital?.name ? (
-                  <Text fontSize={12} color="$text2" numberOfLines={1}>
+                  <Text className="text-[12px] text-text2" numberOfLines={1}>
                     {patient.hospital.name}
                   </Text>
                 ) : null}
-              </YStack>
-            </XStack>
+              </VStack>
+            </HStack>
           </DLCard>
 
           {/* Admission */}
           {care?.live?.isWard ? (
-            <XStack items="center" gap="$2.5" bg="$primarySoft" rounded={13} px="$3.5" py="$3">
-              <BedDouble size={18} color="$primary" />
-              <Text fontSize={13.5} fontWeight="600" color="$primary">
+            <HStack className="items-center gap-[10px] bg-primarySoft rounded-[13px] px-[15px] py-[12px]">
+              <BedDouble size={18} color={C.primary} />
+              <Text className="text-[13.5px] font-plex-semibold text-primary">
                 Currently admitted{care.live.ward ? ` · ${care.live.ward}` : ""}
               </Text>
-            </XStack>
+            </HStack>
           ) : null}
 
           {/* Allergies — the safety headline */}
           <DLCard
-            p="$4"
-            gap="$2.5"
-            borderColor={allergies.length ? "$bad" : "$border"}
-            bg={allergies.length ? "$badSoft" : "$surface"}
+            className={`p-[17px] gap-[10px] ${allergies.length ? "border-bad bg-badSoft" : ""}`}
           >
-            <XStack items="center" gap="$2">
-              {allergies.length ? <ShieldAlert size={18} color="$bad" /> : <ShieldCheck size={18} color="$good" />}
-              <Text fontSize={14.5} fontWeight="800" color="$color12">
+            <HStack className="items-center gap-[7px]">
+              {allergies.length ? <ShieldAlert size={18} color={C.bad} /> : <ShieldCheck size={18} color={C.good} />}
+              <Text className="text-[14.5px] font-plex-bold text-fg">
                 Allergies
               </Text>
-            </XStack>
+            </HStack>
             {allergies.length ? (
               allergies.map((a) => (
-                <XStack key={a.id} items="flex-start" gap="$2">
-                  <TriangleAlert size={14} color="$bad" />
-                  <YStack flex={1}>
-                    <Text fontSize={14} fontWeight="700" color="$color12">
+                <HStack key={a.id} className="items-start gap-[7px]">
+                  <TriangleAlert size={14} color={C.bad} />
+                  <VStack className="flex-1">
+                    <Text className="text-[14px] font-plex-bold text-fg">
                       {a.substance}
                     </Text>
                     {a.reactions.length ? (
-                      <Text fontSize={12} color="$text2">
+                      <Text className="text-[12px] text-text2">
                         {a.reactions.join(", ")}
                         {a.criticality === "high" ? " · high severity" : ""}
                       </Text>
                     ) : null}
-                  </YStack>
-                </XStack>
+                  </VStack>
+                </HStack>
               ))
             ) : (
-              <Text fontSize={13} color="$text2">
+              <Text className="text-[13px] text-text2">
                 No known allergies recorded. Tell your clinician if this is wrong.
               </Text>
             )}
           </DLCard>
 
           {/* Active medicines */}
-          <DLCard p="$4" gap="$2.5">
-            <XStack items="center" gap="$2">
-              <Pill size={18} color="$primary" />
-              <Text fontSize={14.5} fontWeight="800" color="$color12">
+          <DLCard className="p-[17px] gap-[10px]">
+            <HStack className="items-center gap-[7px]">
+              <Pill size={18} color={C.primary} />
+              <Text className="text-[14.5px] font-plex-bold text-fg">
                 Current medicines ({meds.length})
               </Text>
-            </XStack>
+            </HStack>
             {meds.length ? (
               meds.map((m) => (
-                <XStack key={m.id} items="center" justify="space-between" gap="$3">
-                  <Text fontSize={14} fontWeight="600" color="$color12" flex={1} numberOfLines={1}>
+                <HStack key={m.id} className="items-center justify-between gap-[12px]">
+                  <Text className="text-[14px] font-plex-semibold text-fg flex-1" numberOfLines={1}>
                     {[m.name, m.strength].filter(Boolean).join(" ")}
                   </Text>
                   {m.frequency ? (
-                    <Text fontSize={12} color="$text2">
+                    <Text className="text-[12px] text-text2">
                       {m.frequency}
                     </Text>
                   ) : null}
-                </XStack>
+                </HStack>
               ))
             ) : (
-              <Text fontSize={13} color="$text2">
+              <Text className="text-[13px] text-text2">
                 No active medicines on record.
               </Text>
             )}
           </DLCard>
 
-          <Text fontSize={11.5} color="$text3" text="center" px="$4">
+          <Text className="text-[11.5px] text-text3 text-center px-[17px]">
             Read-only summary from your hospital records. Not a substitute for clinical assessment.
           </Text>
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

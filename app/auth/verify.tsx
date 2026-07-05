@@ -9,8 +9,9 @@ import {
   Eye,
   EyeOff,
   Phone,
-} from "@tamagui/lucide-icons";
-import { Button, H1, Paragraph, Text, XStack, YStack } from "tamagui";
+  C,
+} from "@/components/ui/icons";
+import { Heading, Paragraph, Text, HStack, VStack, Pressable, useMedia } from "@/components/ui/gs";
 
 import { trpc } from "@/utils/trpc";
 import {
@@ -22,6 +23,7 @@ import {
 import { AuthLayout, FormStack } from "@/components/auth/layout";
 
 export default function VerificationPage() {
+  const media = useMedia();
   const params = useGlobalSearchParams<{
     token: string;
     field: string;
@@ -75,29 +77,23 @@ export default function VerificationPage() {
 
   return (
     <AuthLayout>
-      <YStack gap="$2">
-        <Button
-          self="flex-start"
-          size="$2"
-          chromeless
-          px="$1"
-          color="$color10"
-          icon={<ArrowLeft size={16} color="$color10" />}
+      <VStack className="gap-[7px]">
+        <Pressable
           onPress={() => backOr("/auth/hospital")}
           accessibilityLabel="Go back to sign in"
+          className="flex-row items-center gap-[7px] self-start px-[2px] py-[2px] active:opacity-60"
         >
-          <Button.Text fontSize="$3" color="$color10">
-            Back
-          </Button.Text>
-        </Button>
+          <ArrowLeft size={16} color={C.text3} />
+          <Text className="text-[14px] text-text3">Back</Text>
+        </Pressable>
 
-        <H1 size="$8" $md={{ size: "$9" }} fontWeight="800" color="$color12">
+        <Heading className={media.md ? "text-[34px]" : "text-[28px]"}>
           Confirm it is you
-        </H1>
-        <Paragraph fontSize="$4" color="$color10" lineHeight="$5">
+        </Heading>
+        <Paragraph className="text-[15px] text-text3 leading-[22px]">
           For your privacy, enter your {fieldLower} to open your health record.
         </Paragraph>
-      </YStack>
+      </VStack>
 
       <FormStack>
         <Controller
@@ -128,25 +124,19 @@ export default function VerificationPage() {
               returnKeyType="go"
               onSubmitEditing={handleSubmit(handleVerify)}
               trailing={
-                <Button
-                  width={44}
-                  height={44}
-                  circular
-                  chromeless
-                  hitSlop={8}
-                  icon={
-                    reveal ? (
-                      <EyeOff size={20} color="$color10" />
-                    ) : (
-                      <Eye size={20} color="$color10" />
-                    )
-                  }
+                <Pressable
                   onPress={() => setReveal((r) => !r)}
+                  hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel={
-                    reveal ? `Hide ${fieldLower}` : `Show ${fieldLower}`
-                  }
-                />
+                  accessibilityLabel={reveal ? `Hide ${fieldLower}` : `Show ${fieldLower}`}
+                  className="w-[44px] h-[44px] rounded-full items-center justify-center active:opacity-60"
+                >
+                  {reveal ? (
+                    <EyeOff size={20} color={C.text3} />
+                  ) : (
+                    <Eye size={20} color={C.text3} />
+                  )}
+                </Pressable>
               }
             />
           )}
@@ -163,11 +153,11 @@ export default function VerificationPage() {
         />
       </FormStack>
 
-      <XStack items="center" gap="$2" px="$1">
-        <Text fontSize="$2" color="$color10" flex={1}>
+      <HStack className="items-center gap-[7px] px-[2px]">
+        <Text className="text-[13px] text-text3 flex-1">
           This step keeps your record private to you.
         </Text>
-      </XStack>
+      </HStack>
     </AuthLayout>
   );
 }

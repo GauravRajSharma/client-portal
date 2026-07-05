@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Search } from "@tamagui/lucide-icons";
+import { Search, C } from "@/components/ui/icons";
 import { router, useGlobalSearchParams } from "expo-router";
-import { Input, Text, XStack, YStack, useMedia } from "tamagui";
+import { HStack, VStack, Text, Input, useMedia } from "@/components/ui/gs";
 import { trpc } from "@/utils/trpc";
 import type { LabResult } from "@/server/dto";
 import {
@@ -50,28 +50,16 @@ export default function Results() {
   return (
     <DLScreen>
       <DLTitle title="Results" subtitle="Your lab tests, newest first." />
-      <XStack
-        items="center"
-        gap="$2.5"
-        bg="$surface"
-        borderWidth={1}
-        borderColor="$borderStrong"
-        rounded={14}
-        px="$3.5"
-        height={48}
-      >
-        <Search size={18} color="$text3" />
+      <HStack className="items-center gap-[10px] bg-surface border border-borderStrong rounded-[14px] px-[15px] h-[48px]">
+        <Search size={18} color={C.text3} />
         <Input
-          unstyled
-          flex={1}
-          fontSize={14.5}
-          color="$color12"
+          className="flex-1 text-[14.5px] text-fg font-plex"
           placeholder="Search by test name…"
-          placeholderTextColor="$text3"
+          placeholderTextColor={C.text3}
           value={search}
           onChangeText={setSearch}
         />
-      </XStack>
+      </HStack>
 
       <DeptChips
         items={[
@@ -101,30 +89,25 @@ export default function Results() {
           }
         />
       ) : (
-        <YStack gap="$5">
+        <VStack className="gap-[23px]">
           {groups.map((g) => (
-            <YStack key={g.date} gap="$2.5">
-              <XStack items="center" justify="space-between" px="$0.5">
-                <Text fontSize={15} fontWeight="700" color="$color12">
-                  {g.date}
-                </Text>
-                <Text fontSize={12} color="$text2">
+            <VStack key={g.date} className="gap-[10px]">
+              <HStack className="items-center justify-between px-[1px]">
+                <Text className="text-[15px] font-plex-bold text-fg">{g.date}</Text>
+                <Text className="text-[12px] text-text2">
                   {g.items.length} result{g.items.length > 1 ? "s" : ""}
                 </Text>
-              </XStack>
-              <YStack
-                gap="$2.5"
-                {...(media.md ? { flexDirection: "row", flexWrap: "wrap" } : {})}
-              >
+              </HStack>
+              <VStack className={media.md ? "flex-row flex-wrap gap-[10px]" : "gap-[10px]"}>
                 {g.items.map((r) => (
-                  <YStack key={r.id} {...(media.md ? { width: "48.5%" } : {})}>
+                  <VStack key={r.id} className={media.md ? "w-[48.5%]" : undefined}>
                     <ResultRow result={r} onPress={() => open(r)} />
-                  </YStack>
+                  </VStack>
                 ))}
-              </YStack>
-            </YStack>
+              </VStack>
+            </VStack>
           ))}
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

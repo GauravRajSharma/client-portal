@@ -2,8 +2,8 @@ import React from "react";
 import { router, useGlobalSearchParams } from "expo-router";
 import { backOr } from "@/utils/nav";
 import { Controller, useForm } from "react-hook-form";
-import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck } from "@tamagui/lucide-icons";
-import { Button, Input, Spinner, Text, XStack, YStack } from "tamagui";
+import { ArrowLeft, ArrowRight, CreditCard, ShieldCheck, C } from "@/components/ui/icons";
+import { Button, Input, Spinner, Text, HStack, VStack, Pressable } from "@/components/ui/gs";
 
 import { trpc } from "@/utils/trpc";
 import { friendlyAuthError } from "@/components/auth/input";
@@ -25,17 +25,11 @@ function FieldRow({
   children: React.ReactNode;
 }) {
   return (
-    <YStack gap="$1.5">
-      <Text fontSize={12.5} fontWeight="700" color="$text2">
-        {label}
-      </Text>
+    <VStack className="gap-[4px]">
+      <Text className="text-[12.5px] font-plex-bold text-text2">{label}</Text>
       {children}
-      {error ? (
-        <Text fontSize={12} color="$bad">
-          {error}
-        </Text>
-      ) : null}
-    </YStack>
+      {error ? <Text className="text-[12px] text-bad">{error}</Text> : null}
+    </VStack>
   );
 }
 
@@ -112,45 +106,36 @@ export default function HospitalSignIn() {
 
   return (
     <AuthLayout>
-      <XStack
-        items="center"
-        gap="$2"
-        self="flex-start"
+      <Pressable
         onPress={() => backOr("/auth/login")}
-        pressStyle={{ opacity: 0.6 }}
+        className="flex-row items-center gap-[7px] self-start active:opacity-60"
       >
-        <ArrowLeft size={18} color="$text2" />
-        <Text fontSize={14} fontWeight="500" color="$text2">
-          Back
-        </Text>
-      </XStack>
+        <ArrowLeft size={18} color={C.text2} />
+        <Text className="text-[14px] font-plex-medium text-text2">Back</Text>
+      </Pressable>
 
-      <YStack gap="$1">
-        <Text fontSize={22} fontWeight="800" color="$color12" letterSpacing={-0.4}>
+      <VStack className="gap-[2px]">
+        <Text className="text-[22px] font-plex-bold text-fg tracking-[-0.4px]">
           {claim === "1" ? "Add a hospital" : "Sign in with your hospital"}
         </Text>
-        <Text fontSize={13.5} color="$text2">
+        <Text className="text-[13.5px] text-text2">
           Use the record number from your hospital card or visit ticket.
         </Text>
-      </YStack>
+      </VStack>
 
-      <YStack gap="$3">
+      <VStack className="gap-[12px]">
         <FieldRow label="Hospital" error={errors.server?.message}>
           {hospitalsLoading ? (
-            <Skeleton height={50} rounded={14} width="100%" />
+            <Skeleton className="h-[50px] rounded-[14px] w-full" />
           ) : hospitalsError || !hospitals?.length ? (
             <Button
-              height={50}
-              rounded={14}
-              bg="$surface"
-              borderWidth={1}
-              borderColor="$border"
+              variant="outline"
               disabled={isRefetching}
               onPress={() => refetchHospitals()}
+              className="h-[50px] rounded-[14px]"
+              textClassName="text-[14px] font-plex-bold text-fg"
             >
-              <Text fontSize={14} fontWeight="700" color="$color12">
-                {isRefetching ? "Trying again…" : "Couldn't load hospitals — retry"}
-              </Text>
+              {isRefetching ? "Trying again…" : "Couldn't load hospitals — retry"}
             </Button>
           ) : (
             <Controller
@@ -181,25 +166,14 @@ export default function HospitalSignIn() {
             }}
             name="mrn"
             render={({ field: { onChange, onBlur, value } }) => (
-              <XStack
-                height={50}
-                rounded={14}
-                borderWidth={1}
-                borderColor={errors.mrn ? "$bad" : "$border"}
-                bg="$surface2"
-                items="center"
-                px="$3.5"
-                gap="$2.5"
-                focusWithinStyle={{ borderColor: "$primary" }}
+              <HStack
+                className={`h-[50px] rounded-[14px] border ${errors.mrn ? "border-bad" : "border-border"} bg-surface2 items-center px-[15px] gap-[10px]`}
               >
-                <CreditCard size={18} color="$text3" />
+                <CreditCard size={18} color={C.text3} />
                 <Input
-                  unstyled
-                  flex={1}
-                  fontSize={15}
-                  color="$color12"
+                  className="flex-1 text-[15px] text-fg"
                   placeholder="ABCD123456"
-                  placeholderTextColor="$text3"
+                  placeholderTextColor={C.text3}
                   value={value}
                   onChangeText={(t) => onChange(t.trim())}
                   onBlur={onBlur}
@@ -209,39 +183,33 @@ export default function HospitalSignIn() {
                   returnKeyType="go"
                   onSubmitEditing={handleSubmit(go)}
                 />
-              </XStack>
+              </HStack>
             )}
           />
         </FieldRow>
 
         {error ? (
-          <Text fontSize={12.5} color="$bad">
-            {friendlyAuthError(error, "signin")}
-          </Text>
+          <Text className="text-[12.5px] text-bad">{friendlyAuthError(error, "signin")}</Text>
         ) : null}
 
         <Button
-          height={52}
-          rounded={14}
-          bg="$primary"
-          borderWidth={0}
-          pressStyle={{ bg: "$primaryStrong" }}
-          opacity={isPending ? 0.7 : 1}
+          variant="solid"
           onPress={isPending ? undefined : handleSubmit(go)}
+          className={`h-[52px] rounded-[14px] ${isPending ? "opacity-70" : ""}`}
         >
-          <XStack items="center" gap="$2.5">
+          <HStack className="items-center gap-[10px]">
             {isPending ? (
-              <Spinner color="$onPrimary" />
+              <Spinner color={C.onPrimary} />
             ) : (
-              <ShieldCheck size={18} color="$onPrimary" />
+              <ShieldCheck size={18} color={C.onPrimary} />
             )}
-            <Text fontSize={16} fontWeight="700" color="$onPrimary">
+            <Text className="text-[16px] font-plex-bold text-onPrimary">
               {isPending ? "Checking your record…" : "Continue"}
             </Text>
-            {!isPending ? <ArrowRight size={18} color="$onPrimary" /> : null}
-          </XStack>
+            {!isPending ? <ArrowRight size={18} color={C.onPrimary} /> : null}
+          </HStack>
         </Button>
-      </YStack>
+      </VStack>
 
       <ScanVisitTicket onScan={onScan} />
     </AuthLayout>

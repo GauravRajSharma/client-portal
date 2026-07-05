@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Modal } from "react-native";
-import { FileText, X } from "@tamagui/lucide-icons";
+import { FileText, X, C } from "@/components/ui/icons";
 import { useLocalSearchParams } from "expo-router";
-import { Text, XStack, YStack } from "tamagui";
+import { HStack, VStack, Text, Pressable } from "@/components/ui/gs";
 import type { PatientReport } from "@/server/dto";
 import {
   DLCard,
@@ -39,56 +39,46 @@ export default function Reports() {
           detail="When a radiologist or doctor writes up a scan or procedure, the report appears here to read full screen."
         />
       ) : (
-        <YStack gap="$2.5">
+        <VStack className="gap-[10px]">
           {data.map((r) => (
-            <DLCard key={r.id} p="$3.5" gap="$2" onPress={() => setOpen(r)} pressStyle={{ opacity: 0.75 }}>
-              <XStack items="center" gap="$3">
-                <YStack width={40} height={40} rounded={11} bg="$primarySoft" items="center" justify="center">
-                  <FileText size={19} color="$primary" />
-                </YStack>
-                <YStack flex={1} minW={0}>
-                  <Text fontSize={15} fontWeight="700" color="$color12" numberOfLines={1}>
-                    {r.title}
-                  </Text>
-                  {r.date ? (
-                    <Text fontSize={12} color="$text2">
-                      {r.date.slice(0, 10)}
+            <Pressable key={r.id} onPress={() => setOpen(r)} className="active:opacity-75">
+              <DLCard className="p-[15px] gap-[7px]">
+                <HStack className="items-center gap-[12px]">
+                  <VStack className="w-[40px] h-[40px] rounded-[11px] bg-primarySoft items-center justify-center">
+                    <FileText size={19} color={C.primary} />
+                  </VStack>
+                  <VStack className="flex-1 min-w-0">
+                    <Text className="text-[15px] font-plex-bold text-fg" numberOfLines={1}>
+                      {r.title}
                     </Text>
-                  ) : null}
-                </YStack>
-                <Text fontSize={12.5} fontWeight="600" color="$primary">
-                  Read
-                </Text>
-              </XStack>
-            </DLCard>
+                    {r.date ? <Text className="text-[12px] text-text2">{r.date.slice(0, 10)}</Text> : null}
+                  </VStack>
+                  <Text className="text-[12.5px] font-plex-semibold text-primary">Read</Text>
+                </HStack>
+              </DLCard>
+            </Pressable>
           ))}
-        </YStack>
+        </VStack>
       )}
 
       {open ? (
         <Modal visible animationType="slide" onRequestClose={() => setOpen(null)}>
-          <YStack flex={1} bg="#fff">
-            <XStack
-              items="center"
-              justify="space-between"
-              px="$4"
-              pt="$6"
-              pb="$2.5"
-              borderBottomWidth={1}
-              borderColor="$border"
-              bg="$surface"
-            >
-              <Text fontSize={15} fontWeight="800" color="$color12" numberOfLines={1} flex={1}>
+          <VStack className="flex-1 bg-surface">
+            <HStack className="items-center justify-between px-[17px] pt-[30px] pb-[10px] border-b border-border bg-surface">
+              <Text className="text-[15px] font-plex-bold text-fg flex-1" numberOfLines={1}>
                 {open.title}
               </Text>
-              <XStack width={36} height={36} rounded={20} bg="$surface2" items="center" justify="center" onPress={() => setOpen(null)} pressStyle={{ opacity: 0.6 }}>
-                <X size={20} color="$color12" />
-              </XStack>
-            </XStack>
-            <YStack flex={1}>
+              <Pressable
+                onPress={() => setOpen(null)}
+                className="w-[36px] h-[36px] rounded-[20px] bg-surface2 items-center justify-center active:opacity-60"
+              >
+                <X size={20} color={C.fg} />
+              </Pressable>
+            </HStack>
+            <VStack className="flex-1">
               <HtmlDoc html={open.html} />
-            </YStack>
-          </YStack>
+            </VStack>
+          </VStack>
         </Modal>
       ) : null}
     </DLScreen>

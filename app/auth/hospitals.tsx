@@ -7,8 +7,9 @@ import {
   LogOut,
   Plus,
   ShieldCheck,
-} from "@tamagui/lucide-icons";
-import { Spinner, Text, XStack, YStack } from "tamagui";
+  C,
+} from "@/components/ui/icons";
+import { Spinner, Text, HStack, VStack, Pressable } from "@/components/ui/gs";
 import {
   DLCard,
   DLScreen,
@@ -50,49 +51,38 @@ export default function MyHospitals() {
         title="Your hospitals"
         subtitle="Pick a hospital to view, or add another from the network."
         action={
-          <XStack
-            items="center"
-            gap="$1.5"
-            px="$2.5"
-            height={32}
-            rounded={16}
-            bg="$surface"
-            borderWidth={1}
-            borderColor="$border"
+          <Pressable
             onPress={signOut}
-            pressStyle={{ opacity: 0.7 }}
+            className="flex-row items-center gap-[4px] px-[10px] h-[32px] rounded-[16px] bg-surface border border-border active:opacity-70"
           >
-            <LogOut size={14} color="$text2" />
-            <Text fontSize={12} fontWeight="600" color="$text2">
-              Sign out
-            </Text>
-          </XStack>
+            <LogOut size={14} color={C.text2} />
+            <Text className="text-[12px] font-plex-semibold text-text2">Sign out</Text>
+          </Pressable>
         }
       />
 
       {/* Add a hospital — the network claim flow. */}
-      <DLCard
-        p="$3.5"
-        gap="$3"
+      <Pressable
         onPress={() => router.push("/auth/hospital?claim=1" as any)}
-        pressStyle={{ opacity: 0.8 }}
-        borderColor="$primary"
+        className="active:opacity-80"
       >
-        <XStack items="center" gap="$3">
-          <YStack width={42} height={42} rounded={12} bg="$primarySoft" items="center" justify="center">
-            <Plus size={22} color="$primary" />
-          </YStack>
-          <YStack flex={1} minW={0}>
-            <Text fontSize={15} fontWeight="700" color="$color12">
-              Add hospital from network
-            </Text>
-            <Text fontSize={12} color="$text2">
-              Verify your MRN to link another hospital's records.
-            </Text>
-          </YStack>
-          <ChevronRight size={20} color="$text3" />
-        </XStack>
-      </DLCard>
+        <DLCard className="p-[15px] gap-[12px] border-primary">
+          <HStack className="items-center gap-[12px]">
+            <VStack className="w-[42px] h-[42px] rounded-[12px] bg-primarySoft items-center justify-center">
+              <Plus size={22} color={C.primary} />
+            </VStack>
+            <VStack className="flex-1 min-w-0">
+              <Text className="text-[15px] font-plex-bold text-fg">
+                Add hospital from network
+              </Text>
+              <Text className="text-[12px] text-text2">
+                Verify your MRN to link another hospital's records.
+              </Text>
+            </VStack>
+            <ChevronRight size={20} color={C.text3} />
+          </HStack>
+        </DLCard>
+      </Pressable>
 
       {isLoading ? (
         <SkeletonList count={2} />
@@ -109,44 +99,45 @@ export default function MyHospitals() {
           detail="Tap “Add hospital from network” to link your first hospital record to this account."
         />
       ) : (
-        <YStack gap="$2.5">
+        <VStack className="gap-[10px]">
           {data.map((h) => {
             const key = `${h.server}:${h.uuid}`;
             const busy = entering === key;
             return (
-              <DLCard
+              <Pressable
                 key={key}
-                p="$3.5"
                 onPress={busy ? undefined : () => open(h.server, h.uuid)}
-                pressStyle={{ opacity: 0.8 }}
+                className="active:opacity-80"
               >
-                <XStack items="center" gap="$3">
-                  <YStack width={44} height={44} rounded={12} bg="$primary" items="center" justify="center">
-                    <Building2 size={20} color="$onPrimary" />
-                  </YStack>
-                  <YStack flex={1} minW={0} gap="$0.5">
-                    <Text fontSize={15} fontWeight="700" color="$color12" numberOfLines={1}>
-                      {h.hospitalName ?? h.prefix}
-                    </Text>
-                    <Text fontSize={12} color="$text2" numberOfLines={1}>
-                      {[h.name, h.ref].filter(Boolean).join(" · ")}
-                    </Text>
-                  </YStack>
-                  {busy ? <Spinner color="$primary" /> : <ChevronRight size={20} color="$text3" />}
-                </XStack>
-              </DLCard>
+                <DLCard className="p-[15px]">
+                  <HStack className="items-center gap-[12px]">
+                    <VStack className="w-[44px] h-[44px] rounded-[12px] bg-primary items-center justify-center">
+                      <Building2 size={20} color={C.onPrimary} />
+                    </VStack>
+                    <VStack className="flex-1 min-w-0 gap-[1px]">
+                      <Text className="text-[15px] font-plex-bold text-fg" numberOfLines={1}>
+                        {h.hospitalName ?? h.prefix}
+                      </Text>
+                      <Text className="text-[12px] text-text2" numberOfLines={1}>
+                        {[h.name, h.ref].filter(Boolean).join(" · ")}
+                      </Text>
+                    </VStack>
+                    {busy ? <Spinner color={C.primary} /> : <ChevronRight size={20} color={C.text3} />}
+                  </HStack>
+                </DLCard>
+              </Pressable>
             );
           })}
-        </YStack>
+        </VStack>
       )}
 
-      <XStack gap="$2.5" p="$3" rounded={12} bg="$surface2" items="flex-start" mt="$1">
-        <ShieldCheck size={15} color="$text3" style={{ marginTop: 2 }} />
-        <Text fontSize={11.5} color="$text2" flex={1} lineHeight={16}>
+      <HStack className="gap-[10px] p-[12px] rounded-[12px] bg-surface2 items-start mt-[2px]">
+        <ShieldCheck size={15} color={C.text3} style={{ marginTop: 2 }} />
+        <Text className="text-[11.5px] text-text2 flex-1 leading-[16px]">
           We store only your email and which hospitals you've linked. Your medical records stay in
           the hospital systems and are fetched only when you open them.
         </Text>
-      </XStack>
+      </HStack>
     </DLScreen>
   );
 }

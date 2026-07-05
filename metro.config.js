@@ -19,16 +19,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 	return context.resolveRequest(context, moduleName, platform);
 };
 
-// add nice web support with optimizing compiler + CSS extraction
-const { withTamagui } = require("@tamagui/metro-plugin");
+// NativeWind: web CSS support + Tailwind processing of global.css.
 const { withNativeWind } = require("nativewind/metro");
 
-// NativeWind wraps the (already Tamagui-wrapped) config during coexistence.
-module.exports = withNativeWind(
-	withTamagui(config, {
-		components: ["tamagui"],
-		config: "./tamagui.config.ts",
-		outputCSS: "./tamagui-web.css",
-	}),
-	{ input: "./global.css" },
-);
+module.exports = withNativeWind(config, { input: "./global.css" });

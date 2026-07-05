@@ -1,7 +1,18 @@
-import { Text, Theme, XStack, YStack } from "tamagui";
+import { HStack, VStack, Text, Pressable } from "./gs";
 import type { LabResult, LabTrendPoint } from "@/server/dto";
 import { labStatusMeta } from "./status";
-import { Row, StatusPill } from "./primitives";
+import { StatusPill } from "./primitives";
+
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+
+type ThemeName = "success" | "warning" | "error" | "accent" | "neutral";
+const THEME_HEX: Record<ThemeName, string> = {
+  success: "#1f9d6b",
+  warning: "#c8860d",
+  error: "#d6453d",
+  accent: "#0b4ea0",
+  neutral: "#0e2440",
+};
 
 /**
  * RangeBar — shows where a value sits within its reference range. A calm band with a
@@ -17,7 +28,7 @@ function RangeBar({
   value?: number;
   low?: number;
   high?: number;
-  theme: "success" | "warning" | "error" | "accent" | "neutral";
+  theme: ThemeName;
   attention: boolean;
 }) {
   if (value === undefined || low === undefined || high === undefined || high <= low) {
@@ -31,36 +42,21 @@ function RangeBar({
   const markerPct = clamp(value) * 100;
   const bandLeft = clamp(low) * 100;
   const bandWidth = (clamp(high) - clamp(low)) * 100;
+  const markerHex = attention && theme !== "neutral" ? THEME_HEX[theme] : "#0e2440";
 
-  // The marker carries the status: in-range reads calm and dark; out-of-range is
-  // pulled into the status theme and made taller/wider so it is the first thing seen.
-  const marker = (
-    <YStack height={10} bg="$color3" rounded="$10" overflow="hidden" position="relative">
+  return (
+    <VStack className="h-[10px] bg-surface3 rounded-full overflow-hidden relative">
       {/* the "normal" band, so a patient can see where in-range sits */}
-      <YStack
-        position="absolute"
-        t={3}
-        height={4}
-        l={`${bandLeft}%`}
-        width={`${bandWidth}%`}
-        rounded="$10"
-        bg="$color6"
+      <VStack
+        className="absolute top-[3px] h-[4px] rounded-full bg-borderStrong"
+        style={{ left: `${bandLeft}%`, width: `${bandWidth}%` }}
       />
-      <YStack
-        position="absolute"
-        height="100%"
-        width={attention ? 4 : 3}
-        l={`${markerPct}%`}
-        rounded="$10"
-        bg={attention ? "$color10" : "$color12"}
+      <VStack
+        className="absolute h-full rounded-full"
+        style={{ left: `${markerPct}%`, width: attention ? 4 : 3, backgroundColor: markerHex }}
       />
-    </YStack>
+    </VStack>
   );
-
-  if (attention && theme !== "neutral") {
-    return <Theme name={theme}>{marker}</Theme>;
-  }
-  return marker;
 }
 
 /**
@@ -81,36 +77,26 @@ export function LabValueRow({
       : undefined;
 
   return (
-    <Row onPress={onPress} flexDirection="column" items="stretch" gap="$2.5" minH={64}>
-      <XStack items="flex-start" justify="space-between" gap="$3">
-        <YStack flex={1} gap="$2">
+    <Pressable
+      onPress={onPress}
+      className={cx("flex-col items-stretch gap-[10px] py-[12px] px-[2px] min-h-[64px]", onPress && "active:opacity-60")}
+    >
+      <HStack className="items-start justify-between gap-[12px]">
+        <VStack className="flex-1 gap-[7px]">
           {/* Status first: plain-language verdict leads, before the number. */}
           <StatusPill label={meta.label} theme={meta.theme} Icon={meta.Icon} size="sm" />
-          <Text fontSize="$4" fontWeight="600" color="$color12" numberOfLines={2}>
+          <Text className="text-[16px] font-plex-semibold text-fg" numberOfLines={2}>
             {result.name}
           </Text>
-          {refText ? (
-            <Text fontSize="$2" color="$color9">
-              Normal {refText}
-            </Text>
-          ) : null}
-        </YStack>
-        <XStack items="baseline" gap="$1">
-          <Text
-            fontSize="$8"
-            fontWeight="800"
-            color={meta.attention ? "$color12" : "$color11"}
-            fontVariant={["tabular-nums"]}
-          >
+          {refText ? <Text className="text-[13px] text-text3">Normal {refText}</Text> : null}
+        </VStack>
+        <HStack className="items-baseline gap-[2px]">
+          <Text className="text-[26px] font-plex-bold text-fg" style={{ fontVariant: ["tabular-nums"] }}>
             {result.value}
           </Text>
-          {result.unit ? (
-            <Text fontSize="$2" color="$color9">
-              {result.unit}
-            </Text>
-          ) : null}
-        </XStack>
-      </XStack>
+          {result.unit ? <Text className="text-[13px] text-text3">{result.unit}</Text> : null}
+        </HStack>
+      </HStack>
       <RangeBar
         value={result.numericValue}
         low={result.referenceLow}
@@ -118,7 +104,7 @@ export function LabValueRow({
         theme={meta.theme}
         attention={meta.attention}
       />
-    </Row>
+    </Pressable>
   );
 }
 
@@ -157,33 +143,25 @@ export function Sparkline({
   const bandHeight = showBand ? yPct(high as number) - bandBottom : 0;
 
   return (
-    <YStack height={height} position="relative">
+    <VStack className="relative" style={{ height }}>
       {showBand ? (
-        <YStack
-          position="absolute"
-          l={0}
-          r={0}
-          b={`${bandBottom}%`}
-          height={`${bandHeight}%`}
-          bg="$color4"
-          rounded="$2"
+        <VStack
+          className="absolute left-0 right-0 bg-surface3 rounded-[5px]"
+          style={{ bottom: `${bandBottom}%`, height: `${bandHeight}%` }}
         />
       ) : null}
-      <XStack height="100%" items="flex-end" gap={2}>
+      <HStack className="h-full items-end" style={{ gap: 2 }}>
         {points.map((p, i) => {
           const h = 4 + ((p.value - min) / range) * (height - 4);
           return (
-            <YStack
+            <VStack
               key={i}
-              flex={1}
-              height={h}
-              minW={3}
-              rounded="$2"
-              bg={inRange(p.value) ? "$color8" : "$color11"}
+              className={cx("flex-1 min-w-[3px] rounded-[5px]", inRange(p.value) ? "bg-text3" : "bg-fg")}
+              style={{ height: h }}
             />
           );
         })}
-      </XStack>
-    </YStack>
+      </HStack>
+    </VStack>
   );
 }

@@ -8,10 +8,11 @@ import {
   Stethoscope,
   Wallet,
   X,
-} from "@tamagui/lucide-icons";
+  C,
+} from "@/components/ui/icons";
 import { router, useLocalSearchParams } from "expo-router";
-import type { NamedExoticComponent } from "react";
-import { Input, Text, XStack, YStack } from "tamagui";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text, Input, Pressable } from "@/components/ui/gs";
 import type { Visit, VisitType } from "@/server/dto";
 import {
   DLCard,
@@ -28,12 +29,12 @@ import { trpc } from "@/utils/trpc";
 // Visit type -> icon + Deltalab status colors. ER is the only attention type.
 const TYPE_META: Record<
   VisitType,
-  { Icon: NamedExoticComponent<any>; color: any; soft: any }
+  { Icon: ComponentType<{ size?: number; color?: string }>; text: string; softBg: string; hex: string }
 > = {
-  OPD: { Icon: BriefcaseMedical, color: "$primary", soft: "$primarySoft" },
-  IPD: { Icon: Bed, color: "$primary", soft: "$primarySoft" },
-  ER: { Icon: Ambulance, color: "$bad", soft: "$badSoft" },
-  OTHER: { Icon: Stethoscope, color: "$text2", soft: "$surface3" },
+  OPD: { Icon: BriefcaseMedical, text: "text-primary", softBg: "bg-primarySoft", hex: C.primary },
+  IPD: { Icon: Bed, text: "text-primary", softBg: "bg-primarySoft", hex: C.primary },
+  ER: { Icon: Ambulance, text: "text-bad", softBg: "bg-badSoft", hex: C.bad },
+  OTHER: { Icon: Stethoscope, text: "text-text2", softBg: "bg-surface3", hex: C.text2 },
 };
 
 const FILTERS = [
@@ -52,56 +53,50 @@ function VisitCard({ visit, onPress }: { visit: Visit; onPress: () => void }) {
   const meta = TYPE_META[visit.type] ?? TYPE_META.OTHER;
   const doc = doctorLine(visit);
   return (
-    <DLCard p="$3.5" gap="$3" onPress={onPress} pressStyle={{ opacity: 0.7 }}>
-      <XStack items="center" gap="$3">
-        <YStack width={42} height={42} rounded={12} bg={meta.soft} items="center" justify="center">
-          <meta.Icon size={20} color={meta.color} />
-        </YStack>
-        <YStack flex={1} minW={0} gap="$1.5">
-          <XStack items="center" gap="$2">
-            <DLStatusPill label={visit.type} color={meta.color} soft={meta.soft} size="sm" />
-            <Text fontSize={15} fontWeight="700" color="$color12" numberOfLines={1} flex={1}>
-              {visit.department ?? visit.typeLabel}
-            </Text>
-          </XStack>
-          {visit.date ? (
-            <Text fontSize={12} color="$text2">
-              {visit.date.slice(0, 10)}
-            </Text>
-          ) : null}
-        </YStack>
-        <ChevronRight size={20} color="$text3" />
-      </XStack>
+    <Pressable onPress={onPress} className="active:opacity-70">
+      <DLCard className="p-[15px] gap-[12px]">
+        <HStack className="items-center gap-[12px]">
+          <VStack className={`w-[42px] h-[42px] rounded-[12px] items-center justify-center ${meta.softBg}`}>
+            <meta.Icon size={20} color={meta.hex} />
+          </VStack>
+          <VStack className="flex-1 min-w-0 gap-[4px]">
+            <HStack className="items-center gap-[7px]">
+              <DLStatusPill label={visit.type} text={meta.text} softBg={meta.softBg} hex={meta.hex} size="sm" />
+              <Text className="text-[15px] font-plex-bold text-fg flex-1" numberOfLines={1}>
+                {visit.department ?? visit.typeLabel}
+              </Text>
+            </HStack>
+            {visit.date ? (
+              <Text className="text-[12px] text-text2">
+                {visit.date.slice(0, 10)}
+              </Text>
+            ) : null}
+          </VStack>
+          <ChevronRight size={20} color={C.text3} />
+        </HStack>
 
-      {(doc || visit.paymentMethod) ? (
-        <XStack
-          items="center"
-          gap="$4"
-          pl={54}
-          pt="$2.5"
-          borderTopWidth={1}
-          borderColor="$border"
-          flexWrap="wrap"
-        >
-          {doc ? (
-            <XStack items="center" gap="$1.5" flex={1} minW={140}>
-              <Stethoscope size={13} color="$text3" />
-              <Text fontSize={12.5} color="$text2" numberOfLines={1}>
-                {doc}
-              </Text>
-            </XStack>
-          ) : null}
-          {visit.paymentMethod ? (
-            <XStack items="center" gap="$1.5">
-              <Wallet size={13} color="$text3" />
-              <Text fontSize={12.5} color="$text2" numberOfLines={1}>
-                {visit.paymentMethod}
-              </Text>
-            </XStack>
-          ) : null}
-        </XStack>
-      ) : null}
-    </DLCard>
+        {(doc || visit.paymentMethod) ? (
+          <HStack className="items-center gap-[17px] pl-[54px] pt-[10px] border-t border-border flex-wrap">
+            {doc ? (
+              <HStack className="items-center gap-[4px] flex-1 min-w-[140px]">
+                <Stethoscope size={13} color={C.text3} />
+                <Text className="text-[12.5px] text-text2" numberOfLines={1}>
+                  {doc}
+                </Text>
+              </HStack>
+            ) : null}
+            {visit.paymentMethod ? (
+              <HStack className="items-center gap-[4px]">
+                <Wallet size={13} color={C.text3} />
+                <Text className="text-[12.5px] text-text2" numberOfLines={1}>
+                  {visit.paymentMethod}
+                </Text>
+              </HStack>
+            ) : null}
+          </HStack>
+        ) : null}
+      </DLCard>
+    </Pressable>
   );
 }
 
@@ -147,49 +142,38 @@ export default function PatientVisits() {
           detail="When you visit the hospital, your appointments and admissions will show up here."
         />
       ) : (
-        <YStack gap="$3.5">
-          <XStack
-            items="center"
-            gap="$2.5"
-            pl="$3.5"
-            pr="$1"
-            height={46}
-            rounded={14}
-            bg="$surface"
-            borderWidth={1}
-            borderColor="$border"
-            focusWithinStyle={{ borderColor: "$primary" }}
-          >
-            <Search size={18} color="$text3" />
+        <VStack className="gap-[15px]">
+          <HStack className="items-center gap-[10px] pl-[15px] pr-[2px] h-[46px] rounded-[14px] bg-surface border border-border">
+            <Search size={18} color={C.text3} />
             <Input
-              flex={1}
-              unstyled
-              fontSize={14}
-              color="$color12"
+              className="flex-1 text-[14px] text-fg"
               placeholder="Search department, doctor, payment"
-              placeholderTextColor="$text3"
+              placeholderTextColor={C.text3}
               value={search}
               onChangeText={setSearch}
             />
             {search.length > 0 ? (
-              <XStack width={40} height={40} items="center" justify="center" onPress={() => setSearch("")} pressStyle={{ opacity: 0.6 }}>
-                <X size={18} color="$text3" />
-              </XStack>
+              <Pressable
+                className="w-[40px] h-[40px] items-center justify-center active:opacity-60"
+                onPress={() => setSearch("")}
+              >
+                <X size={18} color={C.text3} />
+              </Pressable>
             ) : null}
-          </XStack>
+          </HStack>
 
           {chips.length > 2 ? <DeptChips items={chips} value={filter} onChange={setFilter} /> : null}
 
           {filtered.length === 0 ? (
             <EmptyState Icon={Search} title="No matching visits" detail="Try a different filter or clear your search." />
           ) : (
-            <YStack gap="$2.5">
+            <VStack className="gap-[10px]">
               {filtered.map((v) => (
                 <VisitCard key={v.id} visit={v} onPress={() => router.push(`/patient/${uuid}/${v.id}` as any)} />
               ))}
-            </YStack>
+            </VStack>
           )}
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

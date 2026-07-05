@@ -1,5 +1,5 @@
 import { type Lang, useLang } from "@/utils/i18n";
-import { Text, Theme, XStack } from "tamagui";
+import { HStack, Text, Pressable } from "./gs";
 
 /**
  * LanguageToggle — a compact, persistent EN / नेपाली segmented control.
@@ -14,54 +14,31 @@ const OPTIONS: { value: Lang; label: string }[] = [
   { value: "ne", label: "नेपाली" },
 ];
 
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+
 export function LanguageToggle() {
   const { lang, setLang } = useLang();
   return (
-    <XStack
-      bg="$color3"
-      rounded="$10"
-      p="$0.5"
-      gap="$0.5"
-      self="flex-start"
-      role="radiogroup"
-    >
+    <HStack className="bg-surface3 rounded-full p-[1px] gap-[1px] self-start" role="radiogroup">
       {OPTIONS.map((opt) => {
         const active = lang === opt.value;
-        const segment = (
-          <XStack
+        return (
+          <Pressable
             key={opt.value}
-            px="$3.5"
-            py="$2.5"
-            minH={40}
-            items="center"
-            justify="center"
-            rounded="$10"
-            bg={active ? "$accent9" : "transparent"}
-            hoverStyle={active ? {} : { bg: "$color4" }}
-            pressStyle={{ opacity: 0.7 }}
-            animation="quick"
             onPress={() => setLang(opt.value)}
-            cursor="pointer"
+            className={cx(
+              "px-[15px] py-[10px] min-h-[40px] items-center justify-center rounded-full active:opacity-70",
+              active ? "bg-primary" : "bg-transparent",
+            )}
             role="radio"
             aria-checked={active}
           >
-            <Text
-              fontSize="$3"
-              fontWeight={active ? "800" : "600"}
-              color={active ? "#fff" : "$color11"}
-            >
+            <Text className={cx("text-[13px]", active ? "font-plex-bold text-onPrimary" : "font-plex-semibold text-fg")}>
               {opt.label}
             </Text>
-          </XStack>
-        );
-        return active ? (
-          <Theme key={opt.value} name="accent">
-            {segment}
-          </Theme>
-        ) : (
-          segment
+          </Pressable>
         );
       })}
-    </XStack>
+    </HStack>
   );
 }

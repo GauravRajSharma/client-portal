@@ -1,22 +1,18 @@
-import React from "react";
-import {
-  Adapt,
-  type FontSizeTokens,
-  type SelectProps,
-  Select,
-  Sheet,
-  Text,
-  XStack,
-  YStack,
-  getFontSize,
-} from "tamagui";
-import {
-  Building2,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Hospital,
-} from "@tamagui/lucide-icons";
+import React, { useState } from "react";
+import { Modal } from "react-native";
+import { Pressable, ScrollView, Text, HStack, VStack } from "@/components/ui/gs";
+import { Building2, Check, ChevronDown, Hospital, C } from "@/components/ui/icons";
+
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+
+type HospitalSelectProps<T extends { name: string }> = {
+  items: T[];
+  placeholder?: string;
+  invalid?: boolean;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  id?: string;
+};
 
 /**
  * HospitalSelect — Clinical Slate hospital picker.
@@ -27,146 +23,86 @@ import {
  *
  * Visual + a11y only. No data writes; selection just sets the form's server value.
  */
-export function HospitalSelect<T extends { name: string }>(
-  props: SelectProps & { items: T[]; placeholder?: string; invalid?: boolean },
-) {
-  const { items, placeholder = "Select your hospital", invalid, ...rest } = props;
+export function HospitalSelect<T extends { name: string }>(props: HospitalSelectProps<T>) {
+  const { items, placeholder = "Select your hospital", invalid, value, onValueChange } = props;
+  const [open, setOpen] = useState(false);
+
+  const rows = React.useMemo(
+    () =>
+      items.map((item) => {
+        const selected = value === item.name;
+        return (
+          <Pressable
+            key={item.name}
+            onPress={() => {
+              onValueChange?.(item.name);
+              setOpen(false);
+            }}
+            className="flex-row items-center h-[52px] px-[15px] gap-[12px] active:opacity-70"
+          >
+            <Hospital size={18} color={C.text3} />
+            <Text className="text-[16px] text-fg flex-1" numberOfLines={1}>
+              {item.name}
+            </Text>
+            {selected ? <Check size={18} color={C.primary} /> : null}
+          </Pressable>
+        );
+      }),
+    [items, value, onValueChange],
+  );
 
   return (
-    <Select disablePreventBodyScroll {...rest}>
-      <Select.Trigger
-        height={52}
-        bg="$color2"
-        borderWidth={1}
-        borderColor={invalid ? "$red8" : "$borderColor"}
-        rounded="$5"
-        px="$3.5"
-        focusStyle={{
-          borderColor: "$accent8",
-          outlineColor: "$accent8",
-          outlineWidth: 2,
-          outlineStyle: "solid",
-        }}
-        hoverStyle={{ borderColor: "$borderColorHover" }}
-        iconAfter={<ChevronDown size={18} color="$color10" />}
+    <React.Fragment>
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        className={cx(
+          "flex-row items-center gap-[10px] h-[52px] rounded-[10px] px-[15px] bg-surface2 border active:opacity-80",
+          invalid ? "border-bad" : "border-border",
+        )}
       >
-        <XStack items="center" gap="$2.5" flex={1}>
-          <Building2 size={18} color="$color10" />
-          <Select.Value
-            placeholder={placeholder}
-            fontSize="$5"
-            color="$color12"
+        <Building2 size={18} color={C.text3} />
+        <Text
+          className={cx("text-[16px] flex-1", value ? "text-fg" : "text-text3")}
+          numberOfLines={1}
+        >
+          {value ?? placeholder}
+        </Text>
+        <ChevronDown size={18} color={C.text3} />
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOpen(false)}
+      >
+        <VStack className="flex-1 justify-end">
+          {/* Dimmed backdrop; tap to dismiss. */}
+          <Pressable
+            className="absolute inset-0"
+            style={{ backgroundColor: "rgba(16,36,61,0.45)" }}
+            onPress={() => setOpen(false)}
+            accessibilityLabel="Close hospital picker"
           />
-        </XStack>
-      </Select.Trigger>
-
-      <Adapt platform="touch">
-        <Sheet
-          native
-          modal
-          dismissOnSnapToBottom
-          snapPointsMode="fit"
-          animation="quick"
-        >
-          <Sheet.Frame bg="$color1" pt="$2" pb="$6">
-            <Sheet.Handle bg="$color5" />
-            <YStack px="$4" py="$3">
-              <Text fontSize="$6" fontWeight="800" color="$color12">
-                Choose your hospital
-              </Text>
-              <Text fontSize="$2" color="$color10">
-                Where your records are kept
-              </Text>
-            </YStack>
-            <Sheet.ScrollView>
-              <Adapt.Contents />
-            </Sheet.ScrollView>
-          </Sheet.Frame>
-          <Sheet.Overlay
-            bg="$shadowColor"
-            animation="lazy"
-            enterStyle={{ opacity: 0 }}
-            exitStyle={{ opacity: 0 }}
-          />
-        </Sheet>
-      </Adapt>
-
-      <Select.Content zIndex={200000}>
-        <Select.ScrollUpButton
-          items="center"
-          justify="center"
-          position="relative"
-          width="100%"
-          height="$3"
-          bg="$color1"
-        >
-          <ChevronUp size={18} color="$color10" />
-        </Select.ScrollUpButton>
-
-        <Select.Viewport minW={260} bg="$color1" rounded="$5">
-          {items.length === 0 ? (
-            <YStack px="$3.5" py="$4">
-              <Text fontSize="$3" color="$color10">
-                No hospitals available right now.
-              </Text>
-            </YStack>
-          ) : null}
-          <Select.Group>
-            {React.useMemo(
-              () =>
-                items.map((item, i) => (
-                  <Select.Item
-                    index={i}
-                    key={item.name}
-                    value={item.name}
-                    height={52}
-                    px="$3.5"
-                    gap="$3"
-                    hoverStyle={{ bg: "$color3" }}
-                    focusStyle={{ bg: "$color3" }}
-                  >
-                    <Hospital size={18} color="$color9" />
-                    <Select.ItemText fontSize="$5" color="$color12" flex={1}>
-                      {item.name}
-                    </Select.ItemText>
-                    <Select.ItemIndicator marginLeft="auto">
-                      <Check size={18} color="$accent9" />
-                    </Select.ItemIndicator>
-                  </Select.Item>
-                )),
-              [items],
-            )}
-          </Select.Group>
-
-          {props.native ? (
-            <YStack
-              position="absolute"
-              r={0}
-              t={0}
-              b={0}
-              justify="center"
-              width="$4"
-              pointerEvents="none"
-            >
-              <ChevronDown
-                size={getFontSize((props.size as FontSizeTokens) ?? "$true")}
-              />
-            </YStack>
-          ) : null}
-        </Select.Viewport>
-
-        <Select.ScrollDownButton
-          items="center"
-          justify="center"
-          position="relative"
-          width="100%"
-          height="$3"
-          bg="$color1"
-        >
-          <ChevronDown size={18} color="$color10" />
-        </Select.ScrollDownButton>
-      </Select.Content>
-    </Select>
+          <VStack className="bg-surface rounded-t-[20px] pt-[7px] pb-[30px]">
+            <VStack className="w-[36px] h-[4px] rounded-full bg-surface3 self-center" />
+            <VStack className="px-[17px] py-[12px]">
+              <Text className="text-[18px] font-plex-bold text-fg">Choose your hospital</Text>
+              <Text className="text-[12px] text-text3">Where your records are kept</Text>
+            </VStack>
+            <ScrollView>
+              {items.length === 0 ? (
+                <VStack className="px-[15px] py-[17px]">
+                  <Text className="text-[13px] text-text3">No hospitals available right now.</Text>
+                </VStack>
+              ) : null}
+              {rows}
+            </ScrollView>
+          </VStack>
+        </VStack>
+      </Modal>
+    </React.Fragment>
   );
 }
 

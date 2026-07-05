@@ -10,27 +10,31 @@ import {
   Pill,
   Radiation,
   Stethoscope,
-} from "@tamagui/lucide-icons";
-import type { NamedExoticComponent } from "react";
-import { ScrollView, Text, XStack, YStack } from "tamagui";
+  C,
+} from "@/components/ui/icons";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text, Pressable, ScrollView, shadowSoft } from "./gs";
 import type { CareStatus, CareStep } from "@/server/dto";
+
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+type IconC = ComponentType<{ size?: number; color?: string }>;
 
 function StepDot({ status }: { status: CareStep["status"] }) {
   if (status === "completed") {
     return (
-      <YStack width={26} height={26} rounded={20} bg="$good" items="center" justify="center">
+      <VStack className="w-[26px] h-[26px] rounded-full bg-good items-center justify-center">
         <Check size={15} color="#fff" />
-      </YStack>
+      </VStack>
     );
   }
   if (status === "current") {
     return (
-      <YStack width={26} height={26} rounded={20} bg="$primary" items="center" justify="center" borderWidth={3} borderColor="$primarySoft">
-        <YStack width={7} height={7} rounded={10} bg="$onPrimary" />
-      </YStack>
+      <VStack className="w-[26px] h-[26px] rounded-full bg-primary items-center justify-center border-[3px] border-primarySoft">
+        <VStack className="w-[7px] h-[7px] rounded-full bg-onPrimary" />
+      </VStack>
     );
   }
-  return <YStack width={26} height={26} rounded={20} bg="$surface" borderWidth={2} borderColor="$border" />;
+  return <VStack className="w-[26px] h-[26px] rounded-full bg-surface border-2 border-border" />;
 }
 
 /** Horizontal journey stepper (scrolls on small screens). */
@@ -38,29 +42,29 @@ export function CareStepper({ steps }: { steps: CareStep[] }) {
   if (!steps.length) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <XStack items="flex-start" px="$1" pt="$1">
+      <HStack className="items-start px-[2px] pt-[2px]">
         {steps.map((s, i) => (
-          <XStack key={s.key} items="flex-start">
-            <YStack items="center" width={64} gap="$1.5">
+          <HStack key={s.key} className="items-start">
+            <VStack className="items-center w-[64px] gap-[4px]">
               <StepDot status={s.status} />
               <Text
-                fontSize={10.5}
-                fontWeight={s.status === "current" ? "700" : "500"}
-                color={s.status === "pending" ? "$text3" : s.status === "current" ? "$primary" : "$color12"}
-                text="center"
+                className={cx(
+                  "text-[10.5px] text-center",
+                  s.status === "current" ? "font-plex-bold text-primary" : s.status === "pending" ? "font-plex-medium text-text3" : "font-plex-medium text-fg",
+                )}
                 numberOfLines={2}
               >
                 {s.label}
               </Text>
-            </YStack>
+            </VStack>
             {i < steps.length - 1 ? (
-              <YStack height={26} justify="center">
-                <YStack width={22} height={2} rounded={2} bg={s.status === "completed" ? "$good" : "$border"} />
-              </YStack>
+              <VStack className="h-[26px] justify-center">
+                <VStack className={cx("w-[22px] h-[2px] rounded-[2px]", s.status === "completed" ? "bg-good" : "bg-border")} />
+              </VStack>
             ) : null}
-          </XStack>
+          </HStack>
         ))}
-      </XStack>
+      </HStack>
     </ScrollView>
   );
 }
@@ -77,28 +81,26 @@ export function CarePending({ pending }: { pending: CareStatus["pending"] }) {
   const items = PENDING_META.filter((m) => (pending[m.key] ?? 0) > 0);
   if (!items.length) return null;
   return (
-    <XStack gap="$2" flexWrap="wrap">
+    <HStack className="gap-[7px] flex-wrap">
       {items.map((m) => (
-        <XStack key={m.key} items="center" gap="$1.5" bg="$warnSoft" px="$2.5" py="$1.5" rounded={20}>
-          <m.Icon size={13} color="$warn" />
-          <Text fontSize={11.5} fontWeight="600" color="$warn">
+        <HStack key={m.key} className="items-center gap-[4px] bg-warnSoft px-[10px] py-[4px] rounded-[20px]">
+          <m.Icon size={13} color={C.warn} />
+          <Text className="text-[11.5px] font-plex-semibold text-warn">
             {pending[m.key]} {m.label}
             {pending[m.key] > 1 ? "s" : ""} pending
           </Text>
-        </XStack>
+        </HStack>
       ))}
-    </XStack>
+    </HStack>
   );
 }
 
-function LiveChip({ Icon, label }: { Icon: NamedExoticComponent<any>; label: string }) {
+function LiveChip({ Icon, label }: { Icon: IconC; label: string }) {
   return (
-    <XStack items="center" gap="$1.5" bg="$primarySoft" px="$2.5" py="$1.5" rounded={20}>
-      <Icon size={13} color="$primary" />
-      <Text fontSize={11.5} fontWeight="600" color="$primary">
-        {label}
-      </Text>
-    </XStack>
+    <HStack className="items-center gap-[4px] bg-primarySoft px-[10px] py-[4px] rounded-[20px]">
+      <Icon size={13} color={C.primary} />
+      <Text className="text-[11.5px] font-plex-semibold text-primary">{label}</Text>
+    </HStack>
   );
 }
 
@@ -106,9 +108,9 @@ function LiveChip({ Icon, label }: { Icon: NamedExoticComponent<any>; label: str
 export function CareLive({ live }: { live: NonNullable<CareStatus["live"]> }) {
   if (!live.isWard) return null;
   return (
-    <XStack gap="$2" flexWrap="wrap">
+    <HStack className="gap-[7px] flex-wrap">
       <LiveChip Icon={BedDouble} label={live.ward ? `Admitted · ${live.ward}` : "Admitted to ward"} />
-    </XStack>
+    </HStack>
   );
 }
 
@@ -124,52 +126,36 @@ export function CareCard({ care, onPress }: { care: CareStatus; onPress?: () => 
   const wf = WORKFLOW_LABEL[care.workflow ?? ""] ?? "Visit";
   const hours = care.durationHours != null ? Math.round(care.durationHours) : undefined;
   return (
-    <YStack
-      bg="$surface"
-      borderWidth={1}
-      borderColor="$primary"
-      rounded={17}
-      p="$4"
-      gap="$3"
-      shadowColor="rgba(11,78,160,0.12)"
-      shadowRadius={10}
-      shadowOffset={{ width: 0, height: 3 }}
+    <Pressable
       onPress={onPress}
-      pressStyle={onPress ? { opacity: 0.85 } : undefined}
+      className={cx("bg-surface border border-primary rounded-[17px] p-[17px] gap-[12px]", onPress && "active:opacity-[0.85]")}
+      style={{ ...shadowSoft, shadowColor: "rgba(11,78,160,0.12)", shadowRadius: 10 }}
     >
-      <XStack items="center" justify="space-between" gap="$2">
-        <XStack items="center" gap="$2">
-          <YStack width={8} height={8} rounded={10} bg="$good" />
-          <Text fontSize={12} fontWeight="700" color="$good" textTransform="uppercase" letterSpacing={0.4}>
-            In hospital now
-          </Text>
-        </XStack>
-        <XStack items="center" gap="$2">
-          <Text fontSize={11.5} color="$text2">
+      <HStack className="items-center justify-between gap-[7px]">
+        <HStack className="items-center gap-[7px]">
+          <VStack className="w-[8px] h-[8px] rounded-full bg-good" />
+          <Text className="text-[12px] font-plex-bold text-good uppercase tracking-[0.4px]">In hospital now</Text>
+        </HStack>
+        <HStack className="items-center gap-[7px]">
+          <Text className="text-[11.5px] text-text2">
             {wf}
             {care.department ? ` · ${care.department}` : ""}
             {hours != null ? ` · ${hours}h` : ""}
           </Text>
-          {onPress ? <ChevronRight size={16} color="$text3" /> : null}
-        </XStack>
-      </XStack>
+          {onPress ? <ChevronRight size={16} color={C.text3} /> : null}
+        </HStack>
+      </HStack>
 
       {care.stage ? (
-        <YStack gap="$0.5">
-          <Text fontSize={17} fontWeight="800" color="$color12">
-            {care.stage}
-          </Text>
-          {care.stageDetail ? (
-            <Text fontSize={12.5} color="$text2" lineHeight={18}>
-              {care.stageDetail}
-            </Text>
-          ) : null}
-        </YStack>
+        <VStack className="gap-[1px]">
+          <Text className="text-[17px] font-plex-bold text-fg">{care.stage}</Text>
+          {care.stageDetail ? <Text className="text-[12.5px] text-text2 leading-[18px]">{care.stageDetail}</Text> : null}
+        </VStack>
       ) : null}
 
       {care.live ? <CareLive live={care.live} /> : null}
       <CareStepper steps={care.steps} />
       <CarePending pending={care.pending} />
-    </YStack>
+    </Pressable>
   );
 }

@@ -19,11 +19,7 @@ import { httpBatchLink } from "@trpc/client";
 
 import { trpc } from "@/utils/trpc";
 import "../global.css";
-import "../tamagui-web.css";
-import { TamaguiProvider } from "@tamagui/core";
-import tamaguiConfig from "../tamagui.config";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { PortalProvider } from "tamagui";
 
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -121,15 +117,11 @@ export default function RootLayout() {
   }
 
   const app = (
-    <TamaguiProvider config={tamaguiConfig}>
-      <SafeAreaProvider>
-        <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
-          <PortalProvider>
-            <Stack screenOptions={{ headerShown: false }} />
-          </PortalProvider>
-        </SafeAreaView>
-      </SafeAreaProvider>
-    </TamaguiProvider>
+    <SafeAreaProvider>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 
   return (

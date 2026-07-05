@@ -1,7 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
-import { ArrowLeft, ClipboardPlus } from "@tamagui/lucide-icons";
-import { Text, XStack } from "tamagui";
-import { AlphaGate, DLScreen } from "@/components/ui";
+import { ClipboardPlus } from "@/components/ui/icons";
+import { AlphaGate, DLBack, DLScreen } from "@/components/ui";
 import { backOr } from "@/utils/nav";
 
 // Designed in the prototype (4-step add-result wizard). Read-only MVP -> alpha-gated.
@@ -9,12 +8,7 @@ export default function AddResult() {
   const { uuid } = useLocalSearchParams<{ uuid: string }>();
   return (
     <DLScreen>
-      <XStack items="center" gap="$2" onPress={() => backOr(`/patient/${uuid}/home`)} pressStyle={{ opacity: 0.6 }}>
-        <ArrowLeft size={18} color="$text2" />
-        <Text fontSize={14} fontWeight="500" color="$text2">
-          Back
-        </Text>
-      </XStack>
+      <DLBack onPress={() => backOr(`/patient/${uuid}/home`)} />
       <AlphaGate
         Icon={ClipboardPlus}
         title="Add a result yourself"

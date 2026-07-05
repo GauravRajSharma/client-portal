@@ -2,7 +2,7 @@ import { trpc } from "@/utils/trpc";
 import { authClient } from "@/utils/authClient";
 
 import { Redirect } from "expo-router";
-import { Spinner, YStack } from "tamagui";
+import { Spinner, VStack } from "@/components/ui/gs";
 
 /**
  * Entry routing:
@@ -16,9 +16,9 @@ export default function Index() {
 
   if (isLoading || session.isPending)
     return (
-      <YStack flex={1} height="100vh" justify="center" items="center" bg="$background">
-        <Spinner size="large" color="$accent9" />
-      </YStack>
+      <VStack className="flex-1 justify-center items-center bg-appBg">
+        <Spinner size="large" color="#0b4ea0" />
+      </VStack>
     );
 
   if (data?.id) return <Redirect href={`/patient/${data.id}/home` as any} />;

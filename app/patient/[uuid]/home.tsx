@@ -8,9 +8,10 @@ import {
   Scan,
   ShieldAlert,
   Stethoscope,
-} from "@tamagui/lucide-icons";
-import type { NamedExoticComponent } from "react";
-import { Text, XStack, YStack } from "tamagui";
+  C,
+} from "@/components/ui/icons";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text, Pressable } from "@/components/ui/gs";
 import { trpc } from "@/utils/trpc";
 import {
   AlertBanner,
@@ -22,6 +23,8 @@ import {
   RecentRow,
   SkeletonList,
 } from "@/components/ui";
+
+type IconC = ComponentType<{ size?: number; color?: string }>;
 
 const RECORD_LINKS = [
   { Icon: Stethoscope, title: "Visits", detail: "Appointments and admissions", seg: "visits" },
@@ -53,29 +56,27 @@ function GlanceStat({
   Icon,
   value,
   label,
-  tint = "$primary",
-  tintSoft = "$primarySoft",
+  tintHex = C.primary,
+  tintSoftBg = "bg-primarySoft",
   onPress,
 }: {
-  Icon: NamedExoticComponent<any>;
+  Icon: IconC;
   value: string;
   label: string;
-  tint?: any;
-  tintSoft?: any;
+  tintHex?: string;
+  tintSoftBg?: string;
   onPress: () => void;
 }) {
   return (
-    <YStack flex={1} items="center" gap="$1.5" py="$1" onPress={onPress} pressStyle={{ opacity: 0.6 }}>
-      <YStack width={36} height={36} rounded={11} bg={tintSoft} items="center" justify="center">
-        <Icon size={18} color={tint} />
-      </YStack>
-      <Text fontSize={22} fontWeight="700" fontFamily="$mono" color="$color12" letterSpacing={-0.5}>
-        {value}
-      </Text>
-      <Text fontSize={11} fontWeight="600" color="$text2" numberOfLines={1}>
+    <Pressable onPress={onPress} className="flex-1 items-center gap-[4px] py-[2px] active:opacity-60">
+      <VStack className={`w-[36px] h-[36px] rounded-[11px] items-center justify-center ${tintSoftBg}`}>
+        <Icon size={18} color={tintHex} />
+      </VStack>
+      <Text className="text-[22px] font-plex-bold font-plex-mono text-fg tracking-[-0.5px]">{value}</Text>
+      <Text className="text-[11px] font-plex-semibold text-text2" numberOfLines={1}>
         {label}
       </Text>
-    </YStack>
+    </Pressable>
   );
 }
 
@@ -126,30 +127,20 @@ export default function Home() {
   return (
     <DLScreen>
       {/* Compact header: greeting + name on the left, tappable avatar on the right. */}
-      <XStack items="center" justify="space-between" gap="$3" px="$0.5" py="$1">
-        <YStack flex={1} minW={0}>
-          <Text fontSize={13} color="$text2">
-            {greeting()}
-          </Text>
-          <Text fontSize={24} fontWeight="800" color="$color12" letterSpacing={-0.5} numberOfLines={1}>
+      <HStack className="items-center justify-between gap-[12px] px-[1px] py-[2px]">
+        <VStack className="flex-1 min-w-0">
+          <Text className="text-[13px] text-text2">{greeting()}</Text>
+          <Text className="text-[24px] font-plex-bold text-fg tracking-[-0.5px]" numberOfLines={1}>
             {(patient?.name ?? "there").split(" ")[0]}
           </Text>
-        </YStack>
-        <YStack
-          width={46}
-          height={46}
-          rounded={23}
-          bg="$primary"
-          items="center"
-          justify="center"
+        </VStack>
+        <Pressable
           onPress={() => go("profile")}
-          pressStyle={{ opacity: 0.8 }}
+          className="w-[46px] h-[46px] rounded-full bg-primary items-center justify-center active:opacity-80"
         >
-          <Text fontSize={16} fontWeight="700" color="$onPrimary">
-            {initialsOf(patient?.name)}
-          </Text>
-        </YStack>
-      </XStack>
+          <Text className="text-[16px] font-plex-bold text-onPrimary">{initialsOf(patient?.name)}</Text>
+        </Pressable>
+      </HStack>
 
       {/* Priorities first: live visit, then allergy safety. */}
       {careQ.data?.active ? <CareCard care={careQ.data} onPress={() => go("care")} /> : null}
@@ -165,68 +156,46 @@ export default function Home() {
       ) : null}
 
       {/* A whole-picture glance: medicines, visits, results — each tappable. */}
-      <DLCard p="$4" gap="$3.5">
-        <Text fontSize={15} fontWeight="700" color="$color12">
-          At a glance
-        </Text>
-        <XStack>
-          <GlanceStat
-            Icon={Pill}
-            value={String(medCount)}
-            label="Medicines"
-            onPress={() => go("meds")}
-          />
-          <YStack width={1} bg="$border" />
-          <GlanceStat
-            Icon={Stethoscope}
-            value={String(visitCount)}
-            label="Visits"
-            onPress={() => go("visits")}
-          />
-          <YStack width={1} bg="$border" />
+      <DLCard className="p-[17px] gap-[15px]">
+        <Text className="text-[15px] font-plex-bold text-fg">At a glance</Text>
+        <HStack>
+          <GlanceStat Icon={Pill} value={String(medCount)} label="Medicines" onPress={() => go("meds")} />
+          <VStack className="w-[1px] bg-border" />
+          <GlanceStat Icon={Stethoscope} value={String(visitCount)} label="Visits" onPress={() => go("visits")} />
+          <VStack className="w-[1px] bg-border" />
           <GlanceStat
             Icon={FlaskConical}
             value={String(attention.length)}
             label="To review"
-            tint={attention.length ? "$warn" : "$primary"}
-            tintSoft={attention.length ? "$warnSoft" : "$primarySoft"}
+            tintHex={attention.length ? C.warn : C.primary}
+            tintSoftBg={attention.length ? "bg-warnSoft" : "bg-primarySoft"}
             onPress={() => go("results")}
           />
-        </XStack>
+        </HStack>
         {attention.length > 0 ? (
-          <XStack
-            items="center"
-            gap="$2"
-            bg="$warnSoft"
-            rounded={11}
-            px="$3"
-            py="$2.5"
+          <Pressable
             onPress={() => go("results")}
-            pressStyle={{ opacity: 0.7 }}
+            className="flex-row items-center gap-[7px] bg-warnSoft rounded-[11px] px-[12px] py-[10px] active:opacity-70"
           >
-            <Text fontSize={12.5} fontWeight="600" color="$warn" flex={1}>
+            <Text className="text-[12.5px] font-plex-semibold text-warn flex-1">
               {attention.length} result{attention.length > 1 ? "s" : ""} to review:{" "}
               {attention.slice(0, 2).map((r) => r.name).join(", ")}
             </Text>
-            <ChevronRight size={15} color="$warn" />
-          </XStack>
+            <ChevronRight size={15} color={C.warn} />
+          </Pressable>
         ) : null}
       </DLCard>
 
       {/* Recent results — a short, scannable list. */}
       {recent.length > 0 ? (
-        <DLCard overflow="hidden">
-          <XStack items="center" justify="space-between" px="$4" py="$3" borderBottomWidth={1} borderColor="$border">
-            <Text fontSize={15} fontWeight="700" color="$color12">
-              Recent results
-            </Text>
-            <XStack items="center" gap="$1" onPress={() => go("results")} pressStyle={{ opacity: 0.6 }}>
-              <Text fontSize={12.5} fontWeight="600" color="$primary">
-                All
-              </Text>
-              <ChevronRight size={15} color="$primary" />
-            </XStack>
-          </XStack>
+        <DLCard className="overflow-hidden">
+          <HStack className="items-center justify-between px-[17px] py-[12px] border-b border-border">
+            <Text className="text-[15px] font-plex-bold text-fg">Recent results</Text>
+            <Pressable onPress={() => go("results")} className="flex-row items-center gap-[2px] active:opacity-60">
+              <Text className="text-[12.5px] font-plex-semibold text-primary">All</Text>
+              <ChevronRight size={15} color={C.primary} />
+            </Pressable>
+          </HStack>
           {recent.map((r, i) => (
             <RecentRow key={r.id} result={r} border={i > 0} onPress={() => go("results")} />
           ))}
@@ -234,19 +203,10 @@ export default function Home() {
       ) : null}
 
       {/* Records navigation. */}
-      <DLCard overflow="hidden">
-        <Text fontSize={15} fontWeight="700" color="$color12" px="$3.5" pt="$3.5" pb="$1">
-          Your records
-        </Text>
+      <DLCard className="overflow-hidden">
+        <Text className="text-[15px] font-plex-bold text-fg px-[15px] pt-[15px] pb-[2px]">Your records</Text>
         {RECORD_LINKS.map((l, i) => (
-          <DLNavRow
-            key={l.seg}
-            Icon={l.Icon}
-            title={l.title}
-            detail={l.detail}
-            onPress={() => go(l.seg)}
-            border={i > 0}
-          />
+          <DLNavRow key={l.seg} Icon={l.Icon} title={l.title} detail={l.detail} onPress={() => go(l.seg)} border={i > 0} />
         ))}
       </DLCard>
     </DLScreen>

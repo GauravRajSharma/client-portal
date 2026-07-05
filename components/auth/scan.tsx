@@ -1,20 +1,18 @@
-import { Camera, QrCode, ScanLine, X } from "@tamagui/lucide-icons";
+import { QrCode, ScanLine, X, C } from "@/components/ui/icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { throttle } from "lodash";
 import React, { useMemo, useState } from "react";
 import { StyleSheet } from "react-native";
-import { Button, Paragraph, Text, XStack, YStack } from "tamagui";
+import { Box, Paragraph, Pressable, Text, HStack, VStack } from "@/components/ui/gs";
 
 /** A quiet "or" divider with two rules. */
 function OrDivider() {
   return (
-    <XStack items="center" gap="$3" my="$1">
-      <YStack flex={1} height={1} bg="$border" />
-      <Text fontSize={12} fontWeight="600" color="$text3" letterSpacing={0.6}>
-        or
-      </Text>
-      <YStack flex={1} height={1} bg="$border" />
-    </XStack>
+    <HStack className="items-center gap-[12px] my-[2px]">
+      <VStack className="flex-1 h-[1px] bg-border" />
+      <Text className="text-[12px] font-plex-semibold text-text3 tracking-[0.6px]">or</Text>
+      <VStack className="flex-1 h-[1px] bg-border" />
+    </HStack>
   );
 }
 
@@ -56,50 +54,32 @@ export function ScanVisitTicket({
 
   return (
     <React.Fragment>
-      <YStack gap="$2.5">
+      <VStack className="gap-[10px]">
         <OrDivider />
 
-        <XStack
-          items="center"
-          gap="$3"
-          height={60}
-          rounded={14}
-          bg="$surface"
-          borderWidth={1}
-          borderColor="$border"
-          px="$3.5"
-          pressStyle={{ opacity: 0.8 }}
+        <Pressable
+          className="flex-row items-center gap-[12px] h-[60px] rounded-[14px] bg-surface border border-border px-[15px] active:opacity-80"
           onPress={openScanner}
           accessibilityRole="button"
           accessibilityLabel="Scan the QR code on your visit ticket"
         >
-          <YStack width={40} height={40} rounded={11} bg="$primarySoft" items="center" justify="center">
-            <QrCode size={21} color="$primary" />
-          </YStack>
-          <YStack flex={1} minW={0}>
-            <Text fontSize={14.5} fontWeight="700" color="$color12">
-              Scan your visit ticket
-            </Text>
-            <Text fontSize={12} color="$text2">
+          <VStack className="w-[40px] h-[40px] rounded-[11px] bg-primarySoft items-center justify-center">
+            <QrCode size={21} color={C.primary} />
+          </VStack>
+          <VStack className="flex-1 min-w-0">
+            <Text className="text-[14.5px] font-plex-bold text-fg">Scan your visit ticket</Text>
+            <Text className="text-[12px] text-text2">
               {permission && !permission.granted
                 ? "Camera is used only to read the QR code"
                 : "Auto-fills your MRN from the ticket QR"}
             </Text>
-          </YStack>
-          <ScanLine size={20} color="$text3" />
-        </XStack>
-      </YStack>
+          </VStack>
+          <ScanLine size={20} color={C.text3} />
+        </Pressable>
+      </VStack>
 
       {showCamera ? (
-        <YStack
-          position="absolute"
-          t={0}
-          l={0}
-          r={0}
-          b={0}
-          z={1000}
-          bg="black"
-        >
+        <Box className="absolute inset-0 z-[1000] bg-black">
           <CameraView
             style={StyleSheet.absoluteFillObject}
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
@@ -110,68 +90,37 @@ export function ScanVisitTicket({
           />
 
           {/* Reticle + instructions overlay */}
-          <YStack
-            position="absolute"
-            t={0}
-            l={0}
-            r={0}
-            b={0}
-            items="center"
-            justify="center"
-            gap="$6"
+          <VStack
+            className="absolute inset-0 items-center justify-center gap-[30px]"
             pointerEvents="box-none"
           >
-            <YStack
-              width={232}
-              height={232}
-              rounded="$8"
-              borderWidth={3}
-              borderColor="white"
-              items="center"
-              justify="center"
-            >
+            <VStack className="w-[232px] h-[232px] rounded-[22px] border-[3px] border-white items-center justify-center">
               <ScanLine size={56} color="rgba(255,255,255,0.85)" />
-            </YStack>
-            <YStack
-              items="center"
-              gap="$1"
-              px="$6"
-              py="$3"
-              rounded="$6"
-              bg="rgba(0,0,0,0.55)"
-              maxW={320}
+            </VStack>
+            <VStack
+              className="items-center gap-[2px] px-[30px] py-[12px] rounded-[16px] max-w-[320px]"
+              style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
             >
-              <Text fontSize="$5" fontWeight="700" color="white" text="center">
+              <Text className="text-[16px] font-plex-bold text-white text-center">
                 Point the camera at your ticket
               </Text>
-              <Paragraph
-                fontSize="$2"
-                color="rgba(255,255,255,0.85)"
-                text="center"
-              >
+              <Paragraph className="text-[12px] text-center" style={{ color: "rgba(255,255,255,0.85)" }}>
                 Line up the QR code inside the frame. It scans on its own.
               </Paragraph>
-            </YStack>
-          </YStack>
+            </VStack>
+          </VStack>
 
-          <Button
-            position="absolute"
-            t="$6"
-            r="$5"
-            width={56}
-            height={56}
-            circular
+          <Pressable
+            className="absolute top-[30px] right-[23px] w-[56px] h-[56px] rounded-full items-center justify-center border border-[rgba(255,255,255,0.45)] active:opacity-80"
+            style={{ backgroundColor: "rgba(0,0,0,0.62)" }}
             hitSlop={8}
-            bg="rgba(0,0,0,0.62)"
-            borderWidth={1}
-            borderColor="rgba(255,255,255,0.45)"
-            pressStyle={{ bg: "rgba(0,0,0,0.8)" }}
-            icon={<X size={26} color="white" />}
             onPress={() => setShowCamera(false)}
             accessibilityRole="button"
             accessibilityLabel="Close scanner"
-          />
-        </YStack>
+          >
+            <X size={26} color="white" />
+          </Pressable>
+        </Box>
       ) : null}
     </React.Fragment>
   );

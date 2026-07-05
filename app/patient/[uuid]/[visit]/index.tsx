@@ -7,10 +7,11 @@ import {
   Pill,
   Stethoscope,
   Wallet,
-} from "@tamagui/lucide-icons";
+  C,
+} from "@/components/ui/icons";
 import { router, useLocalSearchParams } from "expo-router";
-import type { NamedExoticComponent } from "react";
-import { Text, XStack, YStack } from "tamagui";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text } from "@/components/ui/gs";
 import type { VisitDetail, VisitType } from "@/server/dto";
 import {
   DLBack,
@@ -24,26 +25,29 @@ import {
 } from "@/components/ui";
 import { trpc } from "@/utils/trpc";
 
-const TYPE_META: Record<VisitType, { Icon: NamedExoticComponent<any>; color: any; soft: any }> = {
-  OPD: { Icon: BriefcaseMedical, color: "$primary", soft: "$primarySoft" },
-  IPD: { Icon: Bed, color: "$primary", soft: "$primarySoft" },
-  ER: { Icon: Ambulance, color: "$bad", soft: "$badSoft" },
-  OTHER: { Icon: Stethoscope, color: "$text2", soft: "$surface3" },
+const TYPE_META: Record<
+  VisitType,
+  { Icon: ComponentType<{ size?: number; color?: string }>; text: string; softBg: string; hex: string }
+> = {
+  OPD: { Icon: BriefcaseMedical, text: "text-primary", softBg: "bg-primarySoft", hex: C.primary },
+  IPD: { Icon: Bed, text: "text-primary", softBg: "bg-primarySoft", hex: C.primary },
+  ER: { Icon: Ambulance, text: "text-bad", softBg: "bg-badSoft", hex: C.bad },
+  OTHER: { Icon: Stethoscope, text: "text-text2", softBg: "bg-surface3", hex: C.text2 },
 };
 
 /** One labelled fact inside the hero card. */
-function Fact({ Icon, label, value }: { Icon: NamedExoticComponent<any>; label: string; value?: string }) {
+function Fact({ Icon, label, value }: { Icon: ComponentType<{ size?: number; color?: string }>; label: string; value?: string }) {
   if (!value) return null;
   return (
-    <XStack items="center" gap="$2.5">
-      <Icon size={16} color="$text3" />
-      <Text fontSize={13} color="$text2" width={84}>
+    <HStack className="items-center gap-[10px]">
+      <Icon size={16} color={C.text3} />
+      <Text className="text-[13px] text-text2 w-[84px]">
         {label}
       </Text>
-      <Text fontSize={13.5} fontWeight="600" color="$color12" flex={1}>
+      <Text className="text-[13.5px] font-plex-semibold text-fg flex-1">
         {value}
       </Text>
-    </XStack>
+    </HStack>
   );
 }
 
@@ -65,58 +69,58 @@ export default function VisitDetailScreen() {
       ) : !data ? (
         <EmptyState Icon={Stethoscope} title="Visit not found" detail="This visit may have been removed, or the link is no longer valid." />
       ) : (
-        <YStack gap="$3.5">
+        <VStack className="gap-[15px]">
           {/* Hero */}
-          <DLCard p="$4" gap="$3.5">
-            <XStack items="center" gap="$3">
-              <YStack width={48} height={48} rounded={14} bg={meta.soft} items="center" justify="center">
-                <meta.Icon size={24} color={meta.color} />
-              </YStack>
-              <YStack flex={1} gap="$1.5">
-                <XStack items="center" gap="$2">
-                  <DLStatusPill label={data.type} color={meta.color} soft={meta.soft} size="sm" />
-                  <Text fontSize={18} fontWeight="800" color="$color12" numberOfLines={1} flex={1}>
+          <DLCard className="p-[17px] gap-[15px]">
+            <HStack className="items-center gap-[12px]">
+              <VStack className={`w-[48px] h-[48px] rounded-[14px] items-center justify-center ${meta.softBg}`}>
+                <meta.Icon size={24} color={meta.hex} />
+              </VStack>
+              <VStack className="flex-1 gap-[4px]">
+                <HStack className="items-center gap-[7px]">
+                  <DLStatusPill label={data.type} text={meta.text} softBg={meta.softBg} hex={meta.hex} size="sm" />
+                  <Text className="text-[18px] font-plex-bold text-fg flex-1" numberOfLines={1}>
                     {data.department ?? data.typeLabel}
                   </Text>
-                </XStack>
+                </HStack>
                 {data.date ? (
-                  <Text fontSize={12.5} color="$text2">
+                  <Text className="text-[12.5px] text-text2">
                     {data.date.slice(0, 10)}
                   </Text>
                 ) : null}
-              </YStack>
-            </XStack>
+              </VStack>
+            </HStack>
 
             {(doc || data.paymentMethod || data.paymentType) ? (
-              <YStack gap="$2.5" pt="$3" borderTopWidth={1} borderColor="$border">
+              <VStack className="gap-[10px] pt-[12px] border-t border-border">
                 <Fact Icon={Stethoscope} label="Seen by" value={doc} />
                 <Fact Icon={Wallet} label="Payment" value={[data.paymentMethod, data.paymentType].filter(Boolean).join(" · ") || undefined} />
-              </YStack>
+              </VStack>
             ) : null}
           </DLCard>
 
           {/* Diagnoses */}
           {data.diagnoses && data.diagnoses.length > 0 ? (
-            <DLCard p="$4" gap="$2.5">
-              <Text fontSize={14.5} fontWeight="700" color="$color12">
+            <DLCard className="p-[17px] gap-[10px]">
+              <Text className="text-[14.5px] font-plex-bold text-fg">
                 Diagnoses
               </Text>
               {data.diagnoses.map((dx, i) => (
-                <XStack key={`${dx}-${i}`} items="flex-start" gap="$2.5">
-                  <YStack mt="$1">
-                    <ClipboardList size={15} color="$text3" />
-                  </YStack>
-                  <Text fontSize={14} color="$color12" flex={1} lineHeight={20}>
+                <HStack key={`${dx}-${i}`} className="items-start gap-[10px]">
+                  <VStack className="mt-[2px]">
+                    <ClipboardList size={15} color={C.text3} />
+                  </VStack>
+                  <Text className="text-[14px] text-fg flex-1 leading-[20px]">
                     {dx}
                   </Text>
-                </XStack>
+                </HStack>
               ))}
             </DLCard>
           ) : null}
 
           {/* Sub-screens */}
-          <DLCard overflow="hidden">
-            <Text fontSize={14.5} fontWeight="700" color="$color12" px="$3.5" pt="$3.5" pb="$1">
+          <DLCard className="overflow-hidden">
+            <Text className="text-[14.5px] font-plex-bold text-fg px-[15px] pt-[15px] pb-[2px]">
               For this visit
             </Text>
             <DLNavRow
@@ -133,7 +137,7 @@ export default function VisitDetailScreen() {
               border
             />
           </DLCard>
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

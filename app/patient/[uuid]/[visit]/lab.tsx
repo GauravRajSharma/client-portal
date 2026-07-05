@@ -1,7 +1,7 @@
-import { FlaskConical } from "@tamagui/lucide-icons";
+import { FlaskConical } from "@/components/ui/icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { backOr } from "@/utils/nav";
-import { Text, XStack, YStack } from "tamagui";
+import { HStack, VStack, Text } from "@/components/ui/gs";
 import {
   DLBack,
   DLScreen,
@@ -22,18 +22,16 @@ export default function VisitLabResults() {
     <DLScreen>
       <DLBack label="Visit" onPress={() => backOr(`/patient/${uuid}/${visit}`)} />
 
-      <XStack items="flex-end" justify="space-between" gap="$3" px="$0.5">
-        <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4}>
-          Visit results
-        </Text>
+      <HStack className="items-end justify-between gap-[12px] px-[1px]">
+        <Text className="text-[23px] font-plex-bold text-fg tracking-[-0.4px]">Visit results</Text>
         {data && data.length > 0 ? (
-          <Text fontSize={12.5} color="$text2" pb="$1">
+          <Text className="text-[12.5px] text-text2 pb-[2px]">
             {attention.length > 0
               ? `${attention.length} of ${data.length} need attention`
               : `${data.length} ${data.length === 1 ? "result" : "results"}`}
           </Text>
         ) : null}
-      </XStack>
+      </HStack>
 
       {isLoading ? (
         <SkeletonList count={4} />
@@ -46,7 +44,7 @@ export default function VisitLabResults() {
           detail="When the lab finishes your tests for this visit, they will appear here."
         />
       ) : (
-        <YStack gap="$2.5">
+        <VStack className="gap-[10px]">
           {data.map((result) => (
             <ResultRow
               key={result.id}
@@ -54,7 +52,7 @@ export default function VisitLabResults() {
               onPress={() => router.push(`/patient/${uuid}/results/${encodeURIComponent(result.name)}` as any)}
             />
           ))}
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

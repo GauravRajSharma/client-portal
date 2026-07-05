@@ -9,6 +9,7 @@ import {
   Section,
   Skeleton,
 } from "@/components/ui";
+import { HStack, VStack, Text, Pressable, Paragraph, Button, useMedia } from "@/components/ui/gs";
 import type { PiiKind } from "@/utils/privacy";
 import { useLang, useT } from "@/utils/i18n";
 import { trpc } from "@/utils/trpc";
@@ -17,31 +18,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Building2,
   ChevronRight,
-  FileText,
   FlaskConical,
   Hospital as HospitalIcon,
   IdCard,
   LogOut,
   Phone,
-  Receipt,
-  Scan,
   ShieldCheck,
   ShieldHalf,
-} from "@tamagui/lucide-icons";
+  C,
+} from "@/components/ui/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { NamedExoticComponent } from "react";
-import {
-  AlertDialog,
-  Button,
-  Paragraph,
-  Separator,
-  Text,
-  Theme,
-  XStack,
-  YStack,
-  useMedia,
-} from "tamagui";
+import { Alert } from "react-native";
 
 /** A single labelled detail line: muted label above, strong value below. */
 function DetailRow({
@@ -59,28 +48,26 @@ function DetailRow({
 }) {
   const has = !!value && value.trim().length > 0;
   return (
-    <XStack gap="$3" items="flex-start" py="$2.5">
-      <YStack mt="$1">
-        <Icon size={18} color="$color10" />
-      </YStack>
-      <YStack gap="$0.5" flex={1}>
-        <Text fontSize="$2" color="$color9" fontWeight="600">
+    <HStack className="gap-[12px] items-start py-[10px]">
+      <VStack className="mt-[2px]">
+        <Icon size={18} color={C.text3} />
+      </VStack>
+      <VStack className="gap-[1px] flex-1">
+        <Text className="text-[12px] text-text3 font-plex-semibold">
           {label}
         </Text>
         {pii && has ? (
-          <PiiValue value={value} kind={pii} fontSize={17} fontWeight="700" />
+          <PiiValue value={value} kind={pii} className="text-[17px] font-plex-bold text-fg" />
         ) : (
           <Text
-            fontSize="$5"
-            fontWeight={has ? "700" : "500"}
-            color={has ? "$color12" : "$color9"}
-            fontVariant={["tabular-nums"]}
+            className={`text-[16px] ${has ? "font-plex-bold text-fg" : "font-plex-medium text-text3"}`}
+            style={{ fontVariant: ["tabular-nums"] }}
           >
             {has ? value : placeholder}
           </Text>
         )}
-      </YStack>
-    </XStack>
+      </VStack>
+    </HStack>
   );
 }
 
@@ -101,89 +88,41 @@ function SignOutButton() {
     router.replace("/auth/login");
   };
 
-  return (
-    <AlertDialog>
-      <AlertDialog.Trigger asChild>
-        <Button
-          size="$4"
-          chromeless
-          icon={LogOut}
-          color="$color11"
-          borderColor="$borderColor"
-          borderWidth={1}
-          self="flex-start"
-          pressStyle={{ opacity: 0.7 }}
-        >
-          {T("profile.signOut")}
-        </Button>
-      </AlertDialog.Trigger>
+  const confirmSignOut = () => {
+    Alert.alert(T("profile.signOut.confirm"), T("profile.signOut.detail"), [
+      { text: T("profile.signOut.cancel"), style: "cancel" },
+      { text: T("profile.signOut"), style: "destructive", onPress: signOut },
+    ]);
+  };
 
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay
-          key="overlay"
-          animation="quick"
-          opacity={0.5}
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-        />
-        <AlertDialog.Content
-          bordered
-          elevate
-          key="content"
-          animation={["quick", { opacity: { overshootClamping: true } }]}
-          enterStyle={{ x: 0, y: -12, opacity: 0, scale: 0.96 }}
-          exitStyle={{ x: 0, y: 8, opacity: 0, scale: 0.97 }}
-          gap="$3"
-          maxW={400}
-          width="90%"
-        >
-          <AlertDialog.Title fontSize="$6" fontWeight="800">
-            {T("profile.signOut.confirm")}
-          </AlertDialog.Title>
-          <AlertDialog.Description fontSize="$3" color="$color10">
-            {T("profile.signOut.detail")}
-          </AlertDialog.Description>
-          <XStack gap="$3" justify="flex-end" pt="$2">
-            <AlertDialog.Cancel asChild>
-              <Button size="$3" chromeless>
-                {T("profile.signOut.cancel")}
-              </Button>
-            </AlertDialog.Cancel>
-            <AlertDialog.Action asChild onPress={signOut}>
-              <Theme name="error">
-                <Button size="$3" icon={LogOut}>
-                  {T("profile.signOut")}
-                </Button>
-              </Theme>
-            </AlertDialog.Action>
-          </XStack>
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
-    </AlertDialog>
+  return (
+    <Button variant="outline" icon={LogOut} onPress={confirmSignOut} className="self-start">
+      {T("profile.signOut")}
+    </Button>
   );
 }
 
 function ProfileSkeleton() {
   return (
-    <YStack gap="$4">
-      <Panel gap="$3">
-        <XStack gap="$3" items="center">
-          <Skeleton width={56} height={56} rounded="$10" />
-          <YStack gap="$2" flex={1}>
-            <Skeleton width="55%" height={18} />
-            <Skeleton width="35%" height={12} />
-          </YStack>
-        </XStack>
+    <VStack className="gap-[17px]">
+      <Panel className="gap-[12px]">
+        <HStack className="gap-[12px] items-center">
+          <Skeleton className="w-[56px] h-[56px] rounded-full" />
+          <VStack className="gap-[7px] flex-1">
+            <Skeleton className="w-[55%] h-[18px]" />
+            <Skeleton className="w-[35%] h-[12px]" />
+          </VStack>
+        </HStack>
       </Panel>
-      <Panel gap="$2.5">
+      <Panel className="gap-[10px]">
         {Array.from({ length: 3 }).map((_, i) => (
-          <YStack key={i} gap="$2" py="$2">
-            <Skeleton width="30%" height={11} />
-            <Skeleton width="60%" height={16} />
-          </YStack>
+          <VStack key={i} className="gap-[7px] py-[7px]">
+            <Skeleton className="w-[30%] h-[11px]" />
+            <Skeleton className="w-[60%] h-[16px]" />
+          </VStack>
         ))}
       </Panel>
-    </YStack>
+    </VStack>
   );
 }
 
@@ -222,49 +161,44 @@ export default function Profile() {
   // Identity card: name + the two facts that answer "is this record mine?" (MRN and
   // facility) sit together, directly under the name. Calm, no chrome competing.
   const identityCard = (
-    <Panel gap="$4">
-      <XStack gap="$3" items="center">
+    <Panel className="gap-[17px]">
+      <HStack className="gap-[12px] items-center">
         <Avatar name={data.name} size={56} />
-        <YStack gap="$1" flex={1}>
-          <Text
-            fontSize="$7"
-            fontWeight="800"
-            color="$color12"
-            numberOfLines={2}
-          >
+        <VStack className="gap-[2px] flex-1">
+          <Text className="text-[20px] font-plex-bold text-fg" numberOfLines={2}>
             {data.name || placeholder}
           </Text>
-          <XStack gap="$1.5" items="center">
-            <IdCard size={14} color="$color9" />
-            <PiiValue value={data.mrn} kind="mrn" fontSize={13} fontWeight="600" color="$color10" />
-          </XStack>
+          <HStack className="gap-[4px] items-center">
+            <IdCard size={14} color={C.text3} />
+            <PiiValue value={data.mrn} kind="mrn" className="text-[13px] font-plex-semibold text-text3" />
+          </HStack>
           {data.hospital?.name ? (
-            <XStack gap="$1.5" items="center">
-              <HospitalIcon size={14} color="$color9" />
-              <Text fontSize="$3" color="$color9" numberOfLines={1}>
+            <HStack className="gap-[4px] items-center">
+              <HospitalIcon size={14} color={C.text3} />
+              <Text className="text-[13px] text-text3" numberOfLines={1}>
                 {data.hospital.name}
               </Text>
-            </XStack>
+            </HStack>
           ) : null}
-        </YStack>
-      </XStack>
+        </VStack>
+      </HStack>
 
-      <Separator borderColor="$borderColor" />
+      <VStack className="h-[1px] bg-border" />
 
       {/* Trust note: states the read-only invariant plainly. Not a tappable row. */}
-      <XStack gap="$2.5" items="flex-start">
-        <YStack mt="$0.5">
-          <ShieldCheck size={18} color="$accent9" />
-        </YStack>
-        <YStack gap="$0.5" flex={1}>
-          <Text fontSize="$3" fontWeight="700" color="$color12">
+      <HStack className="gap-[10px] items-start">
+        <VStack className="mt-[1px]">
+          <ShieldCheck size={18} color={C.primary} />
+        </VStack>
+        <VStack className="gap-[1px] flex-1">
+          <Text className="text-[13px] font-plex-bold text-fg">
             {T("profile.viewOnly.title")}
           </Text>
-          <Paragraph fontSize="$2" color="$color10" lineHeight={18}>
+          <Paragraph className="text-[12px] text-text3 leading-[18px]">
             {T("profile.viewOnly.detail")}
           </Paragraph>
-        </YStack>
-      </XStack>
+        </VStack>
+      </HStack>
     </Panel>
   );
 
@@ -272,7 +206,7 @@ export default function Profile() {
   // card above (the "is this me?" fields), so they are not repeated here.
   const details = (
     <Section title={T("profile.details")}>
-      <Panel py="$2">
+      <Panel className="py-[7px]">
         <DetailRow
           Icon={ShieldHalf}
           label={T("profile.field.insurance")}
@@ -280,7 +214,7 @@ export default function Profile() {
           placeholder={placeholder}
           pii="id"
         />
-        <Separator borderColor="$borderColor" />
+        <VStack className="h-[1px] bg-border" />
         <DetailRow
           Icon={Phone}
           label={T("profile.field.phone")}
@@ -294,59 +228,53 @@ export default function Profile() {
 
   return (
     <Screen>
-      <XStack items="center" justify="space-between" gap="$3">
-        <Text fontSize="$8" fontWeight="800" color="$color12">
+      <HStack className="items-center justify-between gap-[12px]">
+        <Text className="text-[23px] font-plex-bold text-fg">
           {T("profile.title")}
         </Text>
-        <XStack items="center" gap="$2">
+        <HStack className="items-center gap-[7px]">
           <PrivacyToggle />
           <LanguageToggle />
-        </XStack>
-      </XStack>
+        </HStack>
+      </HStack>
 
       {media.md ? (
-        <XStack gap="$5" items="flex-start">
-          <YStack flex={3}>{identityCard}</YStack>
-          <YStack flex={2}>{details}</YStack>
-        </XStack>
+        <HStack className="gap-[23px] items-start">
+          <VStack className="flex-[3]">{identityCard}</VStack>
+          <VStack className="flex-[2]">{details}</VStack>
+        </HStack>
       ) : (
-        <YStack gap="$4">
+        <VStack className="gap-[17px]">
           {identityCard}
           {details}
-        </YStack>
+        </VStack>
       )}
 
       <Section title="More">
-        <Panel p="$0" gap="$0">
+        <Panel className="p-0 gap-0">
           {[
             { Icon: ShieldCheck, label: "Health passport", to: "passport" },
             { Icon: FlaskConical, label: "Book a test", to: "book" },
             { Icon: Building2, label: "My Hospitals & Labs", to: "hospitals" },
           ].map((item, i) => (
-            <XStack
+            <Pressable
               key={item.to}
-              items="center"
-              gap="$3"
-              px="$4"
-              py="$3.5"
-              borderTopWidth={i > 0 ? 1 : 0}
-              borderColor="$border"
               onPress={() => router.push(`/patient/${data.id}/${item.to}` as any)}
-              pressStyle={{ opacity: 0.6 }}
+              className={`flex-row items-center gap-[12px] px-[17px] py-[15px] active:opacity-60 ${i > 0 ? "border-t border-border" : ""}`}
             >
-              <YStack width={38} height={38} rounded={10} bg="$primarySoft" items="center" justify="center">
-                <item.Icon size={18} color="$primary" />
-              </YStack>
-              <Text flex={1} fontSize="$4" fontWeight="600" color="$color12">
+              <VStack className="w-[38px] h-[38px] rounded-[10px] bg-primarySoft items-center justify-center">
+                <item.Icon size={18} color={C.primary} />
+              </VStack>
+              <Text className="flex-1 text-[14px] font-plex-semibold text-fg">
                 {item.label}
               </Text>
-              <ChevronRight size={18} color="$text3" />
-            </XStack>
+              <ChevronRight size={18} color={C.text3} />
+            </Pressable>
           ))}
         </Panel>
       </Section>
 
-      <Separator borderColor="$borderColor" my="$2" />
+      <VStack className="h-[1px] bg-border my-[7px]" />
       <SignOutButton />
     </Screen>
   );

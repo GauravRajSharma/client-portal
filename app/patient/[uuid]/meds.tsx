@@ -1,6 +1,6 @@
-import { Clock, Info, Pill, RefreshCw } from "@tamagui/lucide-icons";
-import type { NamedExoticComponent } from "react";
-import { Text, XStack, YStack, useMedia } from "tamagui";
+import { Clock, Info, Pill, RefreshCw, C } from "@/components/ui/icons";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text, useMedia } from "@/components/ui/gs";
 import {
   DLCard,
   DLScreen,
@@ -70,21 +70,21 @@ function dosingSentence(m: Medication): string {
   return `${line}.`;
 }
 
-function Fact({ Icon, label, value }: { Icon: NamedExoticComponent<any>; label: string; value: string }) {
+function Fact({ Icon, label, value }: { Icon: ComponentType<{ size?: number; color?: string }>; label: string; value: string }) {
   return (
-    <XStack items="flex-start" gap="$2" flex={1} minW={130}>
-      <YStack mt="$0.5">
-        <Icon size={15} color="$text3" />
-      </YStack>
-      <YStack gap="$0.5" flex={1}>
-        <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
+    <HStack className="items-start gap-[7px] flex-1 min-w-[130px]">
+      <VStack className="mt-[1px]">
+        <Icon size={15} color={C.text3} />
+      </VStack>
+      <VStack className="gap-[1px] flex-1">
+        <Text className="text-[10.5px] font-plex-bold text-text3 uppercase tracking-[0.3px]">
           {label}
         </Text>
-        <Text fontSize={13.5} fontWeight="600" color="$color12" numberOfLines={2}>
+        <Text className="text-[13.5px] font-plex-semibold text-fg" numberOfLines={2}>
           {value}
         </Text>
-      </YStack>
-    </XStack>
+      </VStack>
+    </HStack>
   );
 }
 
@@ -94,59 +94,59 @@ function MedicineCard({ m }: { m: Medication }) {
   const hasRefills = m.refills !== undefined && m.refills > 0;
 
   return (
-    <DLCard p="$4" gap="$3.5">
-      <XStack items="flex-start" justify="space-between" gap="$3">
-        <XStack items="flex-start" gap="$3" flex={1} minW={0}>
-          <YStack width={40} height={40} rounded={11} bg="$primarySoft" items="center" justify="center" mt="$0.5">
-            <Pill size={20} color="$primary" />
-          </YStack>
-          <YStack flex={1} gap="$0.5" minW={0}>
-            <Text fontSize={17} fontWeight="800" color="$color12" numberOfLines={2}>
+    <DLCard className="p-[17px] gap-[15px]">
+      <HStack className="items-start justify-between gap-[12px]">
+        <HStack className="items-start gap-[12px] flex-1 min-w-0">
+          <VStack className="w-[40px] h-[40px] rounded-[11px] bg-primarySoft items-center justify-center mt-[1px]">
+            <Pill size={20} color={C.primary} />
+          </VStack>
+          <VStack className="flex-1 gap-[1px] min-w-0">
+            <Text className="text-[17px] font-plex-bold text-fg" numberOfLines={2}>
               {medicineTitle(m)}
             </Text>
             {m.form ? (
-              <Text fontSize={12.5} color="$text2">
+              <Text className="text-[12.5px] text-text2">
                 {sentence(m.form)}
               </Text>
             ) : null}
-          </YStack>
-        </XStack>
+          </VStack>
+        </HStack>
         {m.active ? (
-          <DLStatusPill label="Active" color="$good" soft="$goodSoft" size="sm" />
+          <DLStatusPill label="Active" text="text-good" softBg="bg-goodSoft" hex={C.good} size="sm" />
         ) : (
-          <DLStatusPill label="Stopped" color="$text3" soft="$surface3" size="sm" />
+          <DLStatusPill label="Stopped" text="text-text3" softBg="bg-surface3" hex={C.text3} size="sm" />
         )}
-      </XStack>
+      </HStack>
 
       {/* How to take it */}
-      <YStack bg="$surface2" rounded={12} px="$3.5" py="$3" gap="$1" borderWidth={1} borderColor="$border">
-        <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
+      <VStack className="bg-surface2 rounded-[12px] px-[15px] py-[12px] gap-[2px] border border-border">
+        <Text className="text-[10.5px] font-plex-bold text-text3 uppercase tracking-[0.3px]">
           How to take it
         </Text>
-        <Text fontSize={15} fontWeight="600" color="$color12">
+        <Text className="text-[15px] font-plex-semibold text-fg">
           {dosingSentence(m)}
         </Text>
-      </YStack>
+      </VStack>
 
-      <XStack flexWrap="wrap" rowGap="$3" columnGap="$3">
+      <HStack className="flex-wrap gap-[12px]">
         <Fact Icon={Clock} label="Duration" value={durationValue} />
         {hasRefills ? <Fact Icon={RefreshCw} label="Refills left" value={String(m.refills)} /> : null}
-      </XStack>
+      </HStack>
 
       {m.instructions ? (
-        <XStack items="flex-start" gap="$2.5" pt="$3" borderTopWidth={1} borderColor="$border">
-          <YStack mt="$0.5">
-            <Info size={16} color="$primary" />
-          </YStack>
-          <YStack gap="$0.5" flex={1}>
-            <Text fontSize={10.5} fontWeight="700" color="$text3" textTransform="uppercase" letterSpacing={0.3}>
+        <HStack className="items-start gap-[10px] pt-[12px] border-t border-border">
+          <VStack className="mt-[1px]">
+            <Info size={16} color={C.primary} />
+          </VStack>
+          <VStack className="gap-[1px] flex-1">
+            <Text className="text-[10.5px] font-plex-bold text-text3 uppercase tracking-[0.3px]">
               Note from your doctor
             </Text>
-            <Text fontSize={13.5} color="$color12" lineHeight={20}>
+            <Text className="text-[13.5px] text-fg leading-[20px]">
               {sentence(m.instructions)}
             </Text>
-          </YStack>
-        </XStack>
+          </VStack>
+        </HStack>
       ) : null}
     </DLCard>
   );
@@ -156,24 +156,24 @@ function MedicineCard({ m }: { m: Medication }) {
 function MedGroup({ meds, wide }: { meds: Medication[]; wide: boolean }) {
   if (!wide) {
     return (
-      <YStack gap="$3">
+      <VStack className="gap-[12px]">
         {meds.map((m) => (
           <MedicineCard key={m.id} m={m} />
         ))}
-      </YStack>
+      </VStack>
     );
   }
   const mid = Math.ceil(meds.length / 2);
   return (
-    <XStack gap="$3" items="flex-start">
+    <HStack className="gap-[12px] items-start">
       {[meds.slice(0, mid), meds.slice(mid)].map((col, i) => (
-        <YStack key={i} flex={1} gap="$3">
+        <VStack key={i} className="flex-1 gap-[12px]">
           {col.map((m) => (
             <MedicineCard key={m.id} m={m} />
           ))}
-        </YStack>
+        </VStack>
       ))}
-    </XStack>
+    </HStack>
   );
 }
 
@@ -205,14 +205,14 @@ export default function Meds() {
           detail="When your doctor prescribes medicine, it appears here with clear instructions on how to take it."
         />
       ) : (
-        <YStack gap="$5">
+        <VStack className="gap-[23px]">
           {active.length > 0 ? (
-            <YStack gap="$3">
-              <Text fontSize={14.5} fontWeight="700" color="$color12" px="$0.5">
+            <VStack className="gap-[12px]">
+              <Text className="text-[14.5px] font-plex-bold text-fg px-[1px]">
                 {active.length === 1 ? "1 active medicine" : `${active.length} active medicines`}
               </Text>
               <MedGroup meds={active} wide={wide} />
-            </YStack>
+            </VStack>
           ) : (
             <EmptyState
               Icon={Pill}
@@ -222,14 +222,14 @@ export default function Meds() {
           )}
 
           {stopped.length > 0 ? (
-            <YStack gap="$3">
-              <Text fontSize={14.5} fontWeight="700" color="$color12" px="$0.5">
+            <VStack className="gap-[12px]">
+              <Text className="text-[14.5px] font-plex-bold text-fg px-[1px]">
                 Recently stopped
               </Text>
               <MedGroup meds={stopped} wide={wide} />
-            </YStack>
+            </VStack>
           ) : null}
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

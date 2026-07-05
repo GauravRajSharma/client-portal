@@ -7,16 +7,20 @@ import {
   Plus,
   Stethoscope,
   User,
-} from "@tamagui/lucide-icons";
+  C,
+} from "@/components/ui/icons";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import type { NamedExoticComponent, ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Text, Theme, XStack, YStack, useMedia } from "tamagui";
+import { HStack, VStack, Text, Pressable, useMedia } from "./gs";
+
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+type IconC = ComponentType<{ size?: number; color?: string }>;
 
 interface NavItem {
   key: string; // route suffix under /patient/[uuid]/
   labelKey: TKey; // localized label (see utils/i18n)
-  Icon: NamedExoticComponent<any>;
+  Icon: IconC;
 }
 
 // Primary IA. Billing/documents are reached from Home and Profile to keep the bar to 5.
@@ -39,80 +43,32 @@ function go(uuid: string, key: string) {
 }
 
 /** Sidebar nav item (web). */
-function SideItem({
-  item,
-  label,
-  active,
-  onPress,
-}: {
-  item: NavItem;
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function SideItem({ item, label, active, onPress }: { item: NavItem; label: string; active: boolean; onPress: () => void }) {
   return (
-    <XStack
-      items="center"
-      gap="$3"
-      px="$3"
-      py="$2.5"
-      rounded="$4"
-      bg={active ? "$primarySoft" : "transparent"}
-      hoverStyle={{ bg: active ? "$primarySoft" : "$surface2" }}
-      pressStyle={{ opacity: 0.7 }}
-      animation="quick"
+    <Pressable
       onPress={onPress}
-      cursor="pointer"
+      className={cx("flex-row items-center gap-[12px] px-[12px] py-[10px] rounded-[9px] active:opacity-70", active ? "bg-primarySoft" : "bg-transparent")}
     >
-      <item.Icon size={20} color={active ? "$primary" : "$text2"} />
-      <Text
-        fontSize="$4"
-        fontWeight={active ? "700" : "500"}
-        color={active ? "$color12" : "$color11"}
-      >
-        {label}
-      </Text>
-    </XStack>
+      <item.Icon size={20} color={active ? C.primary : C.text2} />
+      <Text className={cx("text-[16px]", active ? "font-plex-bold text-fg" : "font-plex-medium text-fg")}>{label}</Text>
+    </Pressable>
   );
 }
 
 /** Bottom tab (mobile). */
-function Tab({
-  item,
-  label,
-  active,
-  onPress,
-}: {
-  item: NavItem;
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function Tab({ item, label, active, onPress }: { item: NavItem; label: string; active: boolean; onPress: () => void }) {
   return (
-    <YStack
-      flex={1}
-      items="center"
-      justify="center"
-      gap="$1"
-      py="$2"
-      onPress={onPress}
-      pressStyle={{ opacity: 0.6 }}
-    >
-      <item.Icon size={22} color={active ? "$primary" : "$text3"} />
-      <Text
-        fontSize={11}
-        fontWeight={active ? "700" : "500"}
-        color={active ? "$primary" : "$text3"}
-        numberOfLines={1}
-      >
+    <Pressable onPress={onPress} className="flex-1 items-center justify-center gap-[2px] py-[7px] active:opacity-60">
+      <item.Icon size={22} color={active ? C.primary : C.text3} />
+      <Text className={cx("text-[11px]", active ? "font-plex-bold text-primary" : "font-plex-medium text-text3")} numberOfLines={1}>
         {label}
       </Text>
-    </YStack>
+    </Pressable>
   );
 }
 
 /**
- * NavShell — responsive app frame. Web (`gtSm`): persistent left sidebar + content.
+ * NavShell — responsive app frame. Web (`md`): persistent left sidebar + content.
  * Mobile: content + fixed bottom tab bar. Wrap the routed screen as children.
  */
 export function NavShell({ children }: { children: ReactNode }) {
@@ -125,81 +81,41 @@ export function NavShell({ children }: { children: ReactNode }) {
 
   if (media.md) {
     return (
-      <XStack flex={1} bg="$appBg">
-        <YStack
-          width={252}
-          bg="$surface"
-          borderRightWidth={1}
-          borderColor="$border"
-          px="$3"
-          py="$4"
-          gap="$1"
-        >
-          <XStack items="center" gap="$2.5" px="$3" pb="$4">
-            <YStack width={30} height={30} rounded="$4" bg="$primary" items="center" justify="center">
+      <HStack className="flex-1 bg-appBg">
+        <VStack className="w-[252px] bg-surface border-r border-border px-[12px] py-[17px] gap-[2px]">
+          <HStack className="items-center gap-[10px] px-[12px] pb-[17px]">
+            <VStack className="w-[30px] h-[30px] rounded-[9px] bg-primary items-center justify-center">
               <Activity size={18} color="#fff" />
-            </YStack>
-            <Text fontSize="$5" fontWeight="800" color="$color12">
-              EHRPlus
-            </Text>
-          </XStack>
+            </VStack>
+            <Text className="text-[17px] font-plex-bold text-fg">EHRPlus</Text>
+          </HStack>
           {NAV.map((item) => (
-            <SideItem
-              key={item.key}
-              item={item}
-              label={T(item.labelKey)}
-              active={item.key === active}
-              onPress={() => go(patientUuid, item.key)}
-            />
+            <SideItem key={item.key} item={item} label={T(item.labelKey)} active={item.key === active} onPress={() => go(patientUuid, item.key)} />
           ))}
-        </YStack>
-        <YStack flex={1}>{children}</YStack>
-      </XStack>
+        </VStack>
+        <VStack className="flex-1">{children}</VStack>
+      </HStack>
     );
   }
 
   return (
-    <YStack flex={1} bg="$appBg">
-      <YStack flex={1}>{children}</YStack>
+    <VStack className="flex-1 bg-appBg">
+      <VStack className="flex-1">{children}</VStack>
 
       {/* Add result — designed, alpha-gated. */}
-      <YStack
-        position="absolute"
-        r={18}
-        b={insets.bottom + 78}
-        width={54}
-        height={54}
-        rounded={27}
-        bg="$primary"
-        items="center"
-        justify="center"
-        z={60}
-        shadowColor="rgba(11,78,160,0.4)"
-        shadowRadius={16}
-        shadowOffset={{ width: 0, height: 8 }}
-        pressStyle={{ bg: "$primaryStrong", scale: 0.96 }}
+      <Pressable
         onPress={() => router.push(`/patient/${patientUuid}/add` as any)}
+        className="absolute right-[18px] w-[54px] h-[54px] rounded-full bg-primary items-center justify-center z-[60] active:scale-95 active:bg-primaryStrong"
+        style={{ bottom: insets.bottom + 78, shadowColor: "rgba(11,78,160,0.4)", shadowOpacity: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}
       >
-        <Plus size={26} color="$onPrimary" />
-      </YStack>
+        <Plus size={26} color={C.onPrimary} />
+      </Pressable>
 
-      <XStack
-        bg="$surface"
-        borderTopWidth={1}
-        borderColor="$border"
-        pb={insets.bottom}
-        px="$1"
-      >
+      <HStack className="bg-surface border-t border-border px-[2px]" style={{ paddingBottom: insets.bottom }}>
         {NAV.map((item) => (
-          <Tab
-            key={item.key}
-            item={item}
-            label={T(item.labelKey)}
-            active={item.key === active}
-            onPress={() => go(patientUuid, item.key)}
-          />
+          <Tab key={item.key} item={item} label={T(item.labelKey)} active={item.key === active} onPress={() => go(patientUuid, item.key)} />
         ))}
-      </XStack>
-    </YStack>
+      </HStack>
+    </VStack>
   );
 }

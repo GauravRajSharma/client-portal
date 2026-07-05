@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import { ExternalLink, FileBox, FileStack, FileText } from "@tamagui/lucide-icons";
-import type { NamedExoticComponent } from "react";
-import { Text, XStack, YStack } from "tamagui";
+import { ExternalLink, FileBox, FileStack, FileText, C } from "@/components/ui/icons";
+import type { ComponentType } from "react";
+import { HStack, VStack, Text, Pressable } from "@/components/ui/gs";
 import {
   DLCard,
   DLScreen,
@@ -18,7 +18,7 @@ import { trpc } from "@/utils/trpc";
 
 const KIND_META: Record<
   DocumentKind,
-  { label: string; Icon: NamedExoticComponent<any>; description: string }
+  { label: string; Icon: ComponentType<{ size?: number; color?: string }>; description: string }
 > = {
   summary: { label: "Summary", Icon: FileText, description: "A short overview of this visit you can save or print." },
   report: { label: "Report", Icon: FileStack, description: "The detailed report for this visit, with results combined." },
@@ -49,35 +49,28 @@ function DocumentRow({ doc, border }: { doc: PatientDocument; border: boolean })
   }, [doc.url]);
 
   return (
-    <XStack items="center" gap="$3" px="$3.5" py="$3" borderTopWidth={border ? 1 : 0} borderColor="$border">
-      <YStack width={38} height={38} rounded={10} bg="$primarySoft" items="center" justify="center">
-        <meta.Icon size={18} color="$primary" />
-      </YStack>
-      <YStack flex={1} minW={0} gap="$0.5">
-        <Text fontSize={14.5} fontWeight="600" color="$color12">
+    <HStack className={`items-center gap-[12px] px-[15px] py-[12px] ${border ? "border-t border-border" : ""}`}>
+      <VStack className="w-[38px] h-[38px] rounded-[10px] bg-primarySoft items-center justify-center">
+        <meta.Icon size={18} color={C.primary} />
+      </VStack>
+      <VStack className="flex-1 min-w-0 gap-[1px]">
+        <Text className="text-[14.5px] font-plex-semibold text-fg">
           {doc.title}
         </Text>
-        <Text fontSize={11.5} color="$text2" numberOfLines={2}>
+        <Text className="text-[11.5px] text-text2" numberOfLines={2}>
           {meta.description} Opens as a {doc.format.toUpperCase()}.
         </Text>
-      </YStack>
-      <XStack
-        items="center"
-        gap="$1.5"
-        bg="$primary"
-        px="$3"
-        height={34}
-        rounded={10}
+      </VStack>
+      <Pressable
         onPress={onOpen}
-        opacity={opening ? 0.6 : 1}
-        pressStyle={{ bg: "$primaryStrong" }}
+        className={`flex-row items-center gap-[4px] bg-primary px-[12px] h-[34px] rounded-[10px] active:bg-primaryStrong ${opening ? "opacity-60" : ""}`}
       >
-        <Text fontSize={12.5} fontWeight="700" color="$onPrimary">
+        <Text className="text-[12.5px] font-plex-bold text-onPrimary">
           {opening ? "Opening" : Platform.OS === "web" ? "Open" : "View"}
         </Text>
-        {opening ? null : <ExternalLink size={14} color="$onPrimary" />}
-      </XStack>
-    </XStack>
+        {opening ? null : <ExternalLink size={14} color={C.onPrimary} />}
+      </Pressable>
+    </HStack>
   );
 }
 
@@ -103,21 +96,21 @@ export default function Documents() {
           detail="Once you have a visit, your visit summary and report appear here to view or save."
         />
       ) : (
-        <YStack gap="$3">
+        <VStack className="gap-[12px]">
           {data.groups.map((group) => (
-            <DLCard key={group.visitId} overflow="hidden">
-              <XStack items="center" justify="space-between" gap="$3" px="$3.5" py="$3">
-                <Text fontSize={14} fontWeight="700" color="$color12">
+            <DLCard key={group.visitId} className="overflow-hidden">
+              <HStack className="items-center justify-between gap-[12px] px-[15px] py-[12px]">
+                <Text className="text-[14px] font-plex-bold text-fg">
                   {group.date ? group.date.slice(0, 10) : group.title}
                 </Text>
-                <DLStatusPill label={group.typeLabel} color="$primary" soft="$primarySoft" size="sm" />
-              </XStack>
+                <DLStatusPill label={group.typeLabel} text="text-primary" softBg="bg-primarySoft" hex={C.primary} size="sm" />
+              </HStack>
               {group.documents.map((doc) => (
                 <DocumentRow key={doc.id} doc={doc} border />
               ))}
             </DLCard>
           ))}
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

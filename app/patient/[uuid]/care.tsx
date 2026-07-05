@@ -1,6 +1,6 @@
-import { Activity, Check } from "@tamagui/lucide-icons";
+import { Activity, Check } from "@/components/ui/icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { Text, XStack, YStack } from "tamagui";
+import { HStack, VStack, Text } from "@/components/ui/gs";
 import type { CareStep } from "@/server/dto";
 import {
   CareCard,
@@ -32,54 +32,54 @@ function fmtWhen(iso?: string): string {
 }
 
 function StepRow({ step, last, showHere }: { step: CareStep; last: boolean; showHere: boolean }) {
-  const color = step.status === "completed" ? "$good" : step.status === "current" ? "$primary" : "$text3";
+  const dotBg =
+    step.status === "completed" ? "bg-good" : step.status === "current" ? "bg-primary" : "bg-surface";
   return (
-    <XStack gap="$3" items="flex-start">
-      <YStack items="center">
-        <YStack
-          width={24}
-          height={24}
-          rounded={20}
-          bg={step.status === "completed" ? "$good" : step.status === "current" ? "$primary" : "$surface"}
-          borderWidth={step.status === "pending" ? 2 : 0}
-          borderColor="$border"
-          items="center"
-          justify="center"
+    <HStack className="gap-[12px] items-start">
+      <VStack className="items-center">
+        <VStack
+          className={`w-[24px] h-[24px] rounded-[20px] items-center justify-center ${dotBg} ${step.status === "pending" ? "border-2 border-border" : ""}`}
         >
           {step.status === "completed" ? (
             <Check size={13} color="#fff" />
           ) : step.status === "current" ? (
-            <YStack width={7} height={7} rounded={10} bg="$onPrimary" />
+            <VStack className="w-[7px] h-[7px] rounded-[10px] bg-onPrimary" />
           ) : null}
-        </YStack>
-        {!last ? <YStack width={2} height={26} bg={step.status === "completed" ? "$good" : "$border"} /> : null}
-      </YStack>
-      <YStack flex={1} pb={last ? "$0" : "$4"} gap="$0.5">
-        <XStack items="center" justify="space-between" gap="$2">
-          <Text fontSize={14.5} fontWeight={step.status === "current" ? "800" : "700"} color={step.status === "pending" ? "$text2" : "$color12"}>
+        </VStack>
+        {!last ? (
+          <VStack className={`w-[2px] h-[26px] ${step.status === "completed" ? "bg-good" : "bg-border"}`} />
+        ) : null}
+      </VStack>
+      <VStack className={`flex-1 gap-[1px] ${last ? "pb-0" : "pb-[17px]"}`}>
+        <HStack className="items-center justify-between gap-[7px]">
+          <Text
+            className={`text-[14.5px] font-plex-bold ${step.status === "pending" ? "text-text2" : "text-fg"}`}
+          >
             {step.label}
           </Text>
           {step.at ? (
-            <Text fontSize={11} color="$text3" fontFamily="$mono">
+            <Text className="text-[11px] text-text3 font-plex-mono">
               {fmtWhen(step.at)}
             </Text>
           ) : null}
-        </XStack>
+        </HStack>
         {step.detail ? (
-          <Text fontSize={12.5} color={step.status === "pending" ? "$text3" : "$text2"} lineHeight={17}>
+          <Text
+            className={`text-[12.5px] leading-[17px] ${step.status === "pending" ? "text-text3" : "text-text2"}`}
+          >
             {step.detail}
           </Text>
         ) : null}
         {step.status === "current" && showHere ? (
-          <XStack items="center" gap="$1.5" mt="$1">
-            <YStack width={6} height={6} rounded={10} bg="$primary" />
-            <Text fontSize={11.5} color="$primary" fontWeight="700">
+          <HStack className="items-center gap-[4px] mt-[2px]">
+            <VStack className="w-[6px] h-[6px] rounded-[10px] bg-primary" />
+            <Text className="text-[11.5px] text-primary font-plex-bold">
               You are here now
             </Text>
-          </XStack>
+          </HStack>
         ) : null}
-      </YStack>
-    </XStack>
+      </VStack>
+    </HStack>
   );
 }
 
@@ -102,24 +102,24 @@ export default function Care() {
           detail="When you are admitted or seen at the hospital, your live visit progress will show here."
         />
       ) : (
-        <YStack gap="$3.5">
-          <Text fontSize={23} fontWeight="700" color="$color12" letterSpacing={-0.4} px="$0.5">
+        <VStack className="gap-[15px]">
+          <Text className="text-[23px] font-plex-bold text-fg tracking-[-0.4px] px-[1px]">
             Care in progress
           </Text>
 
           <CareCard care={data} />
 
           {data.pending.lab + data.pending.radiology + data.pending.procedure + data.pending.medication > 0 ? (
-            <DLCard p="$4" gap="$2.5">
-              <Text fontSize={14.5} fontWeight="700" color="$color12">
+            <DLCard className="p-[17px] gap-[10px]">
+              <Text className="text-[14.5px] font-plex-bold text-fg">
                 What's still pending
               </Text>
               <CarePending pending={data.pending} />
             </DLCard>
           ) : null}
 
-          <DLCard p="$4" gap="$1">
-            <Text fontSize={14.5} fontWeight="700" color="$color12" pb="$2">
+          <DLCard className="p-[17px] gap-[2px]">
+            <Text className="text-[14.5px] font-plex-bold text-fg pb-[7px]">
               Your visit journey
             </Text>
             {(() => {
@@ -135,10 +135,10 @@ export default function Care() {
             })()}
           </DLCard>
 
-          <Text fontSize={11.5} color="$text3" text="center" px="$4">
+          <Text className="text-[11.5px] text-text3 text-center px-[17px]">
             This is a live, read-only view of your visit. It updates as the hospital records your care.
           </Text>
-        </YStack>
+        </VStack>
       )}
     </DLScreen>
   );

@@ -1,4 +1,3 @@
-import { useTheme } from "tamagui";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
 export interface ChartPoint {
@@ -30,13 +29,12 @@ export function LineChart({
   type?: "area" | "line";
   axis?: boolean;
 }) {
-  const t = useTheme();
-  const v = (k: string, fb: string) => ((t as any)[k]?.val as string) ?? fb;
-  const primary = v("primary", "#0b4ea0");
-  const green = v("good", "#1f9d6b");
-  const greenSoft = v("goodSoft", "#e2f4ec");
-  const surface = v("surface", "#ffffff");
-  const text3 = v("text3", "#7c8b9e");
+  // Light-only palette (mirrors global.css). Dark-mode chart tinting is a follow-up.
+  const primary = "#0b4ea0";
+  const green = "#1f9d6b";
+  const greenSoft = "#e2f4ec";
+  const surface = "#ffffff";
+  const text3 = "#7c8b9e";
 
   if (!points.length) return null;
 

@@ -1,16 +1,8 @@
 import type { ReactNode } from "react";
-import type { NamedExoticComponent } from "react";
-import {
-  Button,
-  H3,
-  Paragraph,
-  ScrollView,
-  Text,
-  Theme,
-  XStack,
-  YStack,
-  styled,
-} from "tamagui";
+import type { ComponentType } from "react";
+import { Box, HStack, VStack, Text, Pressable, ScrollView, Button, Paragraph, shadowSoft } from "./gs";
+
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
 
 /**
  * Screen — the page frame. Constrains content width on web, scrolls, and gives a
@@ -26,27 +18,16 @@ export function Screen({
   maxWidth?: number;
 }) {
   const inner = (
-    <YStack
-      width="100%"
-      maxW={maxWidth}
-      mx="auto"
-      px="$4"
-      pt="$4"
-      pb="$10"
-      gap="$4"
-      $md={{ px: "$6", pt: "$6" }}
+    <VStack
+      className="w-full mx-auto px-[17px] pt-[17px] pb-[57px] gap-[17px] md:px-[30px] md:pt-[30px]"
+      style={{ maxWidth }}
     >
       {children}
-    </YStack>
+    </VStack>
   );
-  if (!scroll)
-    return (
-      <YStack flex={1} bg="$appBg">
-        {inner}
-      </YStack>
-    );
+  if (!scroll) return <VStack className="flex-1 bg-appBg">{inner}</VStack>;
   return (
-    <ScrollView flex={1} bg="$appBg" showsVerticalScrollIndicator={false}>
+    <ScrollView className="flex-1 bg-appBg" showsVerticalScrollIndicator={false}>
       {inner}
     </ScrollView>
   );
@@ -63,54 +44,65 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <YStack gap="$2.5">
+    <VStack className="gap-[10px]">
       {(title || action) && (
-        <XStack items="center" justify="space-between" minH="$2">
-          {title ? (
-            <Text fontSize="$5" fontWeight="700" color="$color11">
-              {title}
-            </Text>
-          ) : (
-            <YStack />
-          )}
+        <HStack className="items-center justify-between min-h-[28px]">
+          {title ? <Text className="text-[17px] font-plex-bold text-fg">{title}</Text> : <VStack />}
           {action}
-        </XStack>
+        </HStack>
       )}
       {children}
-    </YStack>
+    </VStack>
   );
 }
 
 /** Panel — a single bordered surface. Never nest Panels (see DESIGN.md). */
-export const Panel = styled(YStack, {
-  name: "Panel",
-  bg: "$surface",
-  borderColor: "$border",
-  borderWidth: 1,
-  rounded: 16,
-  p: "$4",
-  gap: "$3",
-  shadowColor: "rgba(16,36,61,0.06)",
-  shadowRadius: 6,
-  shadowOffset: { width: 0, height: 2 },
-});
+export function Panel({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <VStack
+      className={cx("bg-surface border border-border rounded-[16px] p-[17px] gap-[12px]", className)}
+      style={shadowSoft}
+    >
+      {children}
+    </VStack>
+  );
+}
 
 /** Row — a tappable list row inside a Panel/list. */
-export const Row = styled(XStack, {
-  name: "Row",
-  items: "center",
-  justify: "space-between",
-  gap: "$3",
-  py: "$3",
-  px: "$1",
-  pressStyle: { opacity: 0.6 },
-  hoverStyle: { bg: "$color2" },
-  animation: "quick",
-});
+export function Row({
+  children,
+  onPress,
+  className,
+}: {
+  children: ReactNode;
+  onPress?: () => void;
+  className?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={cx(
+        "flex-row items-center justify-between gap-[12px] py-[12px] px-[2px] active:opacity-60",
+        className,
+      )}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 type ThemeName = "success" | "warning" | "error" | "accent" | "neutral";
 
-/** StatusPill — compact status chip. Wraps a sub-theme so colors stay consistent. */
+// Sub-theme → (soft bg, strong text/icon) token pair. Replaces Tamagui <Theme name>.
+const PILL: Record<ThemeName, { bg: string; fg: string; hex: string }> = {
+  neutral: { bg: "bg-surface3", fg: "text-text2", hex: "#46566a" },
+  success: { bg: "bg-goodSoft", fg: "text-good", hex: "#1f9d6b" },
+  warning: { bg: "bg-warnSoft", fg: "text-warn", hex: "#c8860d" },
+  error: { bg: "bg-badSoft", fg: "text-bad", hex: "#d6453d" },
+  accent: { bg: "bg-primarySoft", fg: "text-primary", hex: "#0b4ea0" },
+};
+
+/** StatusPill — compact status chip. Colors stay consistent per theme. */
 export function StatusPill({
   label,
   theme = "neutral",
@@ -119,43 +111,33 @@ export function StatusPill({
 }: {
   label: string;
   theme?: ThemeName;
-  Icon?: NamedExoticComponent<any>;
+  Icon?: ComponentType<{ size?: number; color?: string }>;
   size?: "sm" | "md";
 }) {
-  const pad = size === "sm" ? "$1.5" : "$2.5";
-  const font = size === "sm" ? "$1" : "$2";
-  const body = (
-    <XStack
-      items="center"
-      gap="$1.5"
-      px={pad}
-      py="$1"
-      rounded="$10"
-      bg={theme === "neutral" ? "$color3" : "$color4"}
+  const t = PILL[theme];
+  return (
+    <HStack
+      className={cx(
+        "items-center gap-[4px] py-[2px] rounded-full self-start",
+        size === "sm" ? "px-[4px]" : "px-[10px]",
+        t.bg,
+      )}
     >
-      {Icon ? <Icon size={size === "sm" ? 12 : 14} color="$color11" /> : null}
-      <Text fontSize={font} fontWeight="700" color="$color11">
-        {label}
-      </Text>
-    </XStack>
+      {Icon ? <Icon size={size === "sm" ? 12 : 14} color={t.hex} /> : null}
+      <Text className={cx(size === "sm" ? "text-[11px]" : "text-[13px]", "font-plex-bold", t.fg)}>{label}</Text>
+    </HStack>
   );
-  if (theme === "neutral") return body;
-  return <Theme name={theme}>{body}</Theme>;
 }
 
 /** Money — formats minor/major NPR amounts consistently, tabular. */
 export function Money({
   amount,
   currency = "NPR",
-  color = "$color",
-  size = "$6",
-  weight = "700",
+  className,
 }: {
   amount?: number;
   currency?: string;
-  color?: any;
-  size?: any;
-  weight?: any;
+  className?: string;
 }) {
   const v =
     amount === undefined || Number.isNaN(amount)
@@ -163,10 +145,8 @@ export function Money({
       : `${currency} ${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   return (
     <Text
-      fontSize={size}
-      fontWeight={weight}
-      color={color}
-      fontVariant={["tabular-nums"]}
+      className={cx("text-[20px] font-plex-bold text-fg", className)}
+      style={{ fontVariant: ["tabular-nums"] }}
     >
       {v}
     </Text>
@@ -180,30 +160,24 @@ export function EmptyState({
   detail,
   action,
 }: {
-  Icon?: NamedExoticComponent<any>;
+  Icon?: ComponentType<{ size?: number; color?: string }>;
   title: string;
   detail?: string;
   action?: ReactNode;
 }) {
   return (
-    <YStack items="center" justify="center" gap="$3" py="$9" px="$4">
+    <VStack className="items-center justify-center gap-[12px] py-[50px] px-[17px]">
       {Icon ? (
-        <YStack p="$3" rounded="$10" bg="$color3">
-          <Icon size={26} color="$color10" />
-        </YStack>
+        <VStack className="p-[12px] rounded-full bg-surface3">
+          <Icon size={26} color="#7c8b9e" />
+        </VStack>
       ) : null}
-      <YStack items="center" gap="$1.5" maxW={420}>
-        <Text fontSize="$6" fontWeight="700" color="$color12" text="center">
-          {title}
-        </Text>
-        {detail ? (
-          <Paragraph fontSize="$3" color="$color10" text="center">
-            {detail}
-          </Paragraph>
-        ) : null}
-      </YStack>
+      <VStack className="items-center gap-[4px] max-w-[420px]">
+        <Text className="text-[19px] font-plex-bold text-fg text-center">{title}</Text>
+        {detail ? <Paragraph className="text-[15px] text-text3 text-center">{detail}</Paragraph> : null}
+      </VStack>
       {action}
-    </YStack>
+    </VStack>
   );
 }
 
@@ -218,50 +192,36 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <Theme name="error">
-      <YStack items="center" justify="center" gap="$3" py="$9" px="$4">
-        <YStack items="center" gap="$1.5" maxW={420}>
-          <Text fontSize="$6" fontWeight="700" color="$color12" text="center">
-            {title}
-          </Text>
-          <Paragraph fontSize="$3" color="$color11" text="center">
-            {detail}
-          </Paragraph>
-        </YStack>
-        {onRetry ? (
-          <Theme name="accent">
-            <Button size="$3" onPress={onRetry}>
-              Try again
-            </Button>
-          </Theme>
-        ) : null}
-      </YStack>
-    </Theme>
+    <VStack className="items-center justify-center gap-[12px] py-[50px] px-[17px]">
+      <VStack className="items-center gap-[4px] max-w-[420px]">
+        <Text className="text-[19px] font-plex-bold text-bad text-center">{title}</Text>
+        <Paragraph className="text-[15px] text-text2 text-center">{detail}</Paragraph>
+      </VStack>
+      {onRetry ? (
+        <Button onPress={onRetry} className="h-[40px]">
+          Try again
+        </Button>
+      ) : null}
+    </VStack>
   );
 }
 
-/** Skeleton — shimmering placeholder block for loading states (no spinners in content). */
-export const Skeleton = styled(YStack, {
-  name: "Skeleton",
-  bg: "$color3",
-  rounded: "$4",
-  height: 16,
-  opacity: 0.7,
-  animation: "lazy",
-  enterStyle: { opacity: 0.4 },
-});
+/** Skeleton — placeholder block for loading states (no spinners in content). */
+export function Skeleton({ className }: { className?: string }) {
+  return <Box className={cx("bg-surface3 rounded-[9px] h-[16px] opacity-70", className)} />;
+}
 
-/** SkeletonPanel — a Panel-shaped loading placeholder, repeated `count` times. */
+/** SkeletonList — Panel-shaped loading placeholders, repeated `count` times. */
 export function SkeletonList({ count = 3 }: { count?: number }) {
   return (
-    <YStack gap="$3">
+    <VStack className="gap-[12px]">
       {Array.from({ length: count }).map((_, i) => (
-        <Panel key={i} gap="$2.5">
-          <Skeleton width="55%" />
-          <Skeleton width="80%" height={12} />
-          <Skeleton width="35%" height={12} />
+        <Panel key={i} className="gap-[10px]">
+          <Skeleton className="w-[55%]" />
+          <Skeleton className="w-[80%] h-[12px]" />
+          <Skeleton className="w-[35%] h-[12px]" />
         </Panel>
       ))}
-    </YStack>
+    </VStack>
   );
 }

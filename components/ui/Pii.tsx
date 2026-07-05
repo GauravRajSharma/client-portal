@@ -3,24 +3,25 @@
  * tapping (or globally via `PrivacyToggle`). See utils/privacy.ts.
  */
 import { useState } from "react";
-import { Eye, EyeOff } from "@tamagui/lucide-icons";
-import { Text, XStack } from "tamagui";
+import { Eye, EyeOff, C } from "@/components/ui/icons";
+import { HStack, Text, Pressable } from "./gs";
 import { type PiiKind, maskValue, usePrivacy } from "@/utils/privacy";
 
-/** A maskable PII value: dots by default, tap to reveal (unless globally revealed). */
+const cx = (...p: (string | undefined | false | null)[]) => p.filter(Boolean).join(" ");
+
+/**
+ * A maskable PII value: dots by default, tap to reveal (unless globally revealed).
+ * `className` styles the text (size/weight/color); `mono` toggles the mono face.
+ */
 export function PiiValue({
   value,
   kind = "generic",
-  fontSize = 14,
-  fontWeight = "600",
-  color = "$color12",
+  className,
   mono = true,
 }: {
   value?: string;
   kind?: PiiKind;
-  fontSize?: number;
-  fontWeight?: any;
-  color?: any;
+  className?: string;
   mono?: boolean;
 }) {
   const revealAll = usePrivacy((s) => s.revealAll);
@@ -28,21 +29,25 @@ export function PiiValue({
   const shown = revealAll || local;
   const has = !!value && value.trim().length > 0;
   const display = !has ? "—" : shown ? value! : maskValue(value, kind);
+  const tappable = has && !revealAll;
 
-  return (
-    <XStack
-      items="center"
-      gap="$1.5"
-      onPress={has && !revealAll ? () => setLocal((v) => !v) : undefined}
-      pressStyle={has && !revealAll ? { opacity: 0.6 } : undefined}
-    >
-      <Text fontSize={fontSize} fontWeight={fontWeight} color={color} fontFamily={mono ? "$mono" : "$body"} letterSpacing={shown ? 0 : 1}>
+  const body = (
+    <>
+      <Text
+        className={cx("text-[14px] font-plex-semibold text-fg", mono && "font-plex-mono", className)}
+        style={{ letterSpacing: shown ? 0 : 1 }}
+      >
         {display}
       </Text>
-      {has && !revealAll ? (
-        local ? <EyeOff size={13} color="$text3" /> : <Eye size={13} color="$text3" />
-      ) : null}
-    </XStack>
+      {tappable ? local ? <EyeOff size={13} color={C.text3} /> : <Eye size={13} color={C.text3} /> : null}
+    </>
+  );
+
+  if (!tappable) return <HStack className="items-center gap-[4px]">{body}</HStack>;
+  return (
+    <Pressable onPress={() => setLocal((v) => !v)} className="flex-row items-center gap-[4px] active:opacity-60">
+      {body}
+    </Pressable>
   );
 }
 
@@ -51,22 +56,12 @@ export function PrivacyToggle() {
   const revealAll = usePrivacy((s) => s.revealAll);
   const setRevealAll = usePrivacy((s) => s.setRevealAll);
   return (
-    <XStack
-      items="center"
-      gap="$1.5"
-      px="$2.5"
-      height={32}
-      rounded={16}
-      bg="$surface"
-      borderWidth={1}
-      borderColor="$border"
+    <Pressable
       onPress={() => setRevealAll(!revealAll)}
-      pressStyle={{ opacity: 0.7 }}
+      className="flex-row items-center gap-[4px] px-[10px] h-[32px] rounded-[16px] bg-surface border border-border active:opacity-70"
     >
-      {revealAll ? <Eye size={14} color="$text2" /> : <EyeOff size={14} color="$text2" />}
-      <Text fontSize={12} fontWeight="600" color="$text2">
-        {revealAll ? "Hide" : "Show"}
-      </Text>
-    </XStack>
+      {revealAll ? <Eye size={14} color={C.text2} /> : <EyeOff size={14} color={C.text2} />}
+      <Text className="text-[12px] font-plex-semibold text-text2">{revealAll ? "Hide" : "Show"}</Text>
+    </Pressable>
   );
 }

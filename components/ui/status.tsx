@@ -5,7 +5,7 @@ import {
   ChevronsUp,
   Check,
   Minus,
-} from "@tamagui/lucide-icons";
+} from "@/components/ui/icons";
 import type { NamedExoticComponent } from "react";
 import type { LabStatus } from "@/server/dto";
 

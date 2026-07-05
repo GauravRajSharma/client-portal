@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Modal, Platform, ScrollView as RNScrollView } from "react-native";
+import { Modal, Platform, ScrollView as RNScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { Check, Download, Maximize2, Scan, X } from "@tamagui/lucide-icons";
-import { Text, XStack, YStack, useWindowDimensions } from "tamagui";
+import { Check, Download, Maximize2, Scan, X } from "@/components/ui/icons";
+import { HStack, VStack, Text, Pressable } from "@/components/ui/gs";
 import type { ImagingImage } from "@/server/dto";
 import {
   DLBack,
@@ -57,7 +57,7 @@ function FullScreenViewer({
 
   return (
     <Modal visible animationType="fade" onRequestClose={onClose} transparent={false}>
-      <YStack flex={1} bg="#05070a">
+      <VStack className="flex-1 bg-[#05070a]">
         <RNScrollView
           horizontal
           pagingEnabled
@@ -78,85 +78,55 @@ function FullScreenViewer({
         </RNScrollView>
 
         {/* Top controls overlaid on the image */}
-        <XStack
-          position="absolute"
-          t={0}
-          l={0}
-          r={0}
-          items="center"
-          justify="space-between"
-          px="$4"
-          pt="$6"
-          pb="$3"
-        >
-          <YStack
-            width={40}
-            height={40}
-            rounded={20}
-            bg="rgba(255,255,255,0.14)"
-            items="center"
-            justify="center"
+        <HStack className="absolute top-0 left-0 right-0 items-center justify-between px-[17px] pt-[30px] pb-[12px]">
+          <Pressable
             onPress={onClose}
-            pressStyle={{ opacity: 0.6 }}
+            className="w-[40px] h-[40px] rounded-[20px] bg-[rgba(255,255,255,0.14)] items-center justify-center active:opacity-60"
           >
             <X size={20} color="#fff" />
-          </YStack>
-          <Text fontSize={13} fontWeight="600" color="rgba(255,255,255,0.9)">
+          </Pressable>
+          <Text className="text-[13px] font-plex-semibold text-[rgba(255,255,255,0.9)]">
             {page + 1} / {images.length}
           </Text>
-          <XStack
-            items="center"
-            gap="$1.5"
-            bg="rgba(255,255,255,0.14)"
-            px="$3"
-            height={40}
-            rounded={20}
+          <Pressable
             onPress={onSave}
-            pressStyle={{ opacity: 0.6 }}
+            className="flex-row items-center gap-[4px] bg-[rgba(255,255,255,0.14)] px-[12px] h-[40px] rounded-[20px] active:opacity-60"
           >
             {saved[page] ? <Check size={16} color="#7ee0a6" /> : <Download size={16} color="#fff" />}
-            <Text fontSize={13} fontWeight="700" color="#fff">
+            <Text className="text-[13px] font-plex-bold text-[#fff]">
               {saved[page] ? "Saved" : "Save"}
             </Text>
-          </XStack>
-        </XStack>
-      </YStack>
+          </Pressable>
+        </HStack>
+      </VStack>
     </Modal>
   );
 }
 
 function Thumb({ image, index, width, onOpen }: { image: ImagingImage; index: number; width: number; onOpen: () => void }) {
   return (
-    <DLCard p="$2" gap="$2" overflow="hidden" onPress={onOpen} pressStyle={{ opacity: 0.85 }}>
-      <YStack>
-        <Image
-          source={{ uri: toApiUrl(image.url) }}
-          style={{ width: "100%", height: Math.round(width * 1.2), borderRadius: 12, backgroundColor: "#0b1f33" }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          transition={200}
-        />
-        <XStack
-          position="absolute"
-          b="$3"
-          r="$3"
-          items="center"
-          gap="$1.5"
-          bg="rgba(5,7,10,0.6)"
-          px="$2.5"
-          height={32}
-          rounded={16}
-        >
-          <Maximize2 size={14} color="#fff" />
-          <Text fontSize={12} fontWeight="700" color="#fff">
-            Full screen
-          </Text>
-        </XStack>
-      </YStack>
-      <Text fontSize={12} color="$text2" px="$2" pb="$1">
-        Image {index + 1} · tap to open
-      </Text>
-    </DLCard>
+    <Pressable onPress={onOpen} className="active:opacity-85">
+      <DLCard className="p-[7px] gap-[7px] overflow-hidden">
+        <VStack>
+          <Image
+            source={{ uri: toApiUrl(image.url) }}
+            style={{ width: "100%", height: Math.round(width * 1.2), borderRadius: 12, backgroundColor: "#0b1f33" }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+          <HStack className="absolute bottom-[12px] right-[12px] items-center gap-[4px] bg-[rgba(5,7,10,0.6)] px-[10px] h-[32px] rounded-[16px]">
+            <Maximize2 size={14} color="#fff" />
+            <Text className="text-[12px] font-plex-bold text-[#fff]">
+              Full screen
+            </Text>
+          </HStack>
+        </VStack>
+        <Text className="text-[12px] text-text2 px-[7px] pb-[2px]">
+          Image {index + 1} · tap to open
+        </Text>
+      </DLCard>
+    </Pressable>
   );
 }
 
@@ -179,24 +149,24 @@ export default function StudyViewer() {
       ) : !study || !study.hasImages ? (
         <EmptyState Icon={Scan} title="No images for this study" detail="The images for this scan are not available." />
       ) : (
-        <YStack gap="$3">
-          <YStack px="$0.5" gap="$1">
-            <Text fontSize={20} fontWeight="800" color="$color12">
+        <VStack className="gap-[12px]">
+          <VStack className="px-[1px] gap-[2px]">
+            <Text className="text-[20px] font-plex-bold text-fg">
               {study.name}
             </Text>
-            <Text fontSize={12.5} color="$text2">
+            <Text className="text-[12.5px] text-text2">
               {[study.date?.slice(0, 10), `${study.imageCount} image${study.imageCount > 1 ? "s" : ""}`, "tap to view full screen"]
                 .filter(Boolean)
                 .join(" · ")}
             </Text>
-          </YStack>
+          </VStack>
           {study.images.map((img, i) => (
             <Thumb key={i} image={img} index={i} width={paneWidth} onOpen={() => setFsIndex(i)} />
           ))}
-          <Text fontSize={11.5} color="$text3" text="center" px="$4" pt="$1">
+          <Text className="text-[11.5px] text-text3 text-center px-[17px] pt-[2px]">
             Read-only copies of your scan. For the radiologist's report, see Documents.
           </Text>
-        </YStack>
+        </VStack>
       )}
 
       {fsIndex !== null && study?.images ? (
